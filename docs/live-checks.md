@@ -14,8 +14,8 @@ Source under test: `06166f181cf8f3102f1e128bcacc61500ecce25c`. Provider: OpenRou
 
 ## Remaining verification and configuration
 
-- Test actual barcode recognition, permission denial/retry, and dictation start/stop on a physical iPhone. Simulator compilation does not verify camera/microphone hardware.
-- The local server key does not provision hosted Sites runtime secrets. Configure OPENROUTER_API_KEY as a server secret on the hosted backend before using native chat against that URL. Never bundle a provider key in the native app or browser assets.
+- Test actual barcode recognition, permission denial/retry, and dictation start/stop on a physical iPhone. Simulator compilation does not verify camera/microphone hardware. A paired iPhone was detected, but the device build failed because Xcode reported “No Accounts” and no development provisioning profile for `com.kggreco11.nutrient`. Sign in through Xcode Settings → Accounts, then retry the development build using the existing Apple team. No device app was installed by this attempt.
+- Hosted backend configured with `OPENROUTER_API_KEY` as a masked runtime secret (environment revision 1), and the saved production version redeployed successfully. An authenticated `capacitor://localhost` request returned HTTP 200 for status and chat; an ambiguous burrito returned questions with no proposal. Private native clients still need the Site service-access token in backend settings. Never bundle either credential in source or browser assets.
 - Web extraction is a reviewable model output. The harness checks citation membership and numeric structure, not semantic correctness of every source or portion.
 
 Evidence images are local ignored artifacts: `artifacts/live-meal-review.png` and `artifacts/readable-mobile.png`. They use synthetic foods and the labeled sample day.
