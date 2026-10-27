@@ -9,7 +9,7 @@ Source under test: `06166f181cf8f3102f1e128bcacc61500ecce25c`. Provider: OpenRou
 - Missing branded food: one standard serving of CAVA Crazy Feta dip searched two database queries (zero matches) before requesting web fallback. The model returned a cited official CAVA PDF, 70 kcal, 4 g protein, 1 g carbohydrate, 6 g fat and 0 g fiber. Unreported micronutrients remained null. The extracted row was independently checked against the cited PDF. This verifies this extraction case, not comprehensive current restaurant coverage or future accuracy.
 - Browser confirmation: the chicken proposal rendered 1.5 × 100 g and 248 rounded kcal. Before confirmation, the sample diary remained 1,203 kcal and score 79. Confirming added exactly one chicken entry to Breakfast (582 kcal total). Removing the synthetic test entry restored Breakfast to 334 kcal, total 1,203 kcal and score 79.
 - All 25 automated tests passed.
-- Production web build and Capacitor iOS sync passed. Xcode simulator build passed with signing disabled.
+- Production web build and Capacitor iOS sync passed. Xcode simulator build passed with signing disabled. The actual `iphoneos` arm64 build also passed with signing disabled, compiling and linking the native scanner and speech implementation for device hardware. This unsigned artifact cannot be installed on an iPhone; signing remains required.
 - Larger typography was checked at 390 px and 1440 px widths. Body and form text are 16–17 px, supporting text at least 14 px, with rem sizing and mobile layout reflow. Diary, nutrients, chat and trends had no page-wide horizontal overflow at 390 px. Dense charts scroll within their own containers.
 
 ## Remaining verification and configuration
