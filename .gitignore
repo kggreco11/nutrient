@@ -5,3 +5,5 @@ dist/
 !.env.example
 
 artifacts/
+
+server/generated-assets.js

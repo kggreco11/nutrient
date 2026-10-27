@@ -1,0 +1,12 @@
+{
+  "source": "USDA FoodData Central / SR Legacy",
+  "release": "April 2018 (final SR release)",
+  "publicationDate": "2019-04-01",
+  "downloadUrl": "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip",
+  "sourceSha256": "b80817294b8850530aaedf2e515c02593b1824f763a0ff356e5c2081643e6fd0",
+  "foodCount": 7793,
+  "restaurantCount": 312,
+  "basis": "per 100 g",
+  "license": "Public domain / CC0",
+  "micronutrients": "Vitamin A as RAE; folate as DFE; vitamin D in micrograms; omega-3 only when all ALA/EPA/DHA/DPA components are reported"
+}

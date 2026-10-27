@@ -1,71 +1,93 @@
 # Nutrient
 
-An independent, free nutrition tracker inspired by the depth of Cronometer, with a calmer interface and nutrient coverage at the center. No subscriptions, locked charts, or paid nutrient breakdowns.
+An independent nutrition tracker for iOS and the web. Today's nutrient progress is the home screen; a separate Trends tab shows monthly averages, target coverage and recurring gaps. There are no nutrient paywalls or background AI analysis jobs.
 
-## Run locally
+## Run
 
-Requires Node.js 20.19+ or 22.12+.
+Node.js 20.19+ or 22.12+, npm, and Xcode for iOS.
 
 ```sh
 npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. To verify and build:
+The browser preview runs at the URL Vite prints. The dev server includes the server-only assistant endpoint.
 
 ```sh
 npm test
 npm run build
-npm run preview
+npm run ios:sync
+npm run ios:open
 ```
 
-## What works
+`npm run build` creates `dist/client` for the native app, and `dist/server/index.js` for the hosted Worker. Native builds never contain the server's OpenRouter key. The Xcode bundle ID is `com.kggreco11.nutrient`, using Capacitor 8 with Swift Package Manager. A simulator build needs no signing; installing on an iPhone requires your Apple signing team.
 
-- Responsive overview with a nutrient coverage score, energy, macros, category scores, lowest-coverage nutrients, meal summaries, and water tracking.
-- Date-based food diary, four meal groups, fractional servings, editing, moving, and removing entries.
-- Searchable local food library and custom foods with all tracked nutrient fields.
-- Free packaged-food barcode lookup through [Open Food Facts](https://world.openfoodfacts.org), with imported food values cached locally. No API key is needed. Enter the barcode digits; camera scanning is not implemented.
-- Twenty-one nutrient breakdowns: 10 vitamins, 6 minerals, fiber, omega-3, and 3 macros. Click any nutrient for its contributing foods.
-- Seven-day nutrient score chart based on actual diary entries, with empty days excluded from the average.
-- Editable daily energy, macro, nutrient, and water targets.
-- Browser-local persistence, validated JSON backup import, and full data export.
+## Conversational logging
 
-## Score definition
+Conversation understanding belongs to the **LLM**, not a handwritten food parser. The server defaults to OpenRouter's `deepseek/deepseek-v4.1-flash`, configurable through `OPENROUTER_MODEL`.
 
-The daily score is the rounded, equally weighted mean of coverage for 18 nutrients (the 21 tracked nutrients excluding the 3 macros):
+1. The user describes foods, restaurant components, supplements and portions in chat or dictates a transcript.
+2. The model searches saved foods and USDA records through `search_food_database`. Packaged products can use `lookup_barcode`.
+3. The assistant asks about unclear food identity, preparation, components or amounts.
+4. After a database lookup proves insufficient, `request_web_fallback` enables OpenRouter web search and page/PDF fetching. The system prompt requires official manufacturer/restaurant sources, source citations and explicit serving bases. No restaurant has a special hardcoded flow.
+5. `propose_meal` returns food records and serving multipliers. Database IDs must have appeared in tool results. Sourced nutrition must cite a returned URL and supply explicit values or nulls.
+6. The app independently totals the proposal, displays its sources and missing data, and **waits for Confirm & log meal**. No model tool can write a diary entry.
 
-```text
-coverage[nutrient] = min(100, intake / target × 100)
-daily score = round(sum(coverage) / 18)
+The single source of assistant instructions is [`server/policy.js`](server/policy.js); orchestration and tool validation are in [`server/agent.js`](server/agent.js). The model cannot invoke arbitrary application actions. Retrieved content is treated as evidence, not instructions. Search is enabled after database lookup, with bounded model/tool rounds and output tokens. See [`docs/assistant.md`](docs/assistant.md) for the contract and limits.
+
+### OpenRouter setup
+
+Copy `.env.example` to ignored `.env.local` and set `OPENROUTER_API_KEY` locally. Do not paste the key into chat, app fields, source code, Vite client variables, or a GitHub commit. Restart the dev server after changing this file. `OPENROUTER_MODEL` defaults to `deepseek/deepseek-v4.1-flash`.
+
+For the hosted Worker, configure these as server runtime values in the hosting service. Local `.env.local` values are not uploaded or automatically deployed. Model tokens and web tools consume OpenRouter credits. The app's nutrient views and manual food logging work without an AI key. No live model test can run until a real key is configured; automated tests mock provider responses.
+
+`GET /api/status` reports whether a provider key is configured, without returning it. `POST /api/chat` runs a user-triggered conversation turn. Private hosted access is enforced by Sites. Standalone/native API deployments can use a separate `NUTRIENT_API_TOKEN`; do not use the OpenRouter key as an app access token. The iOS Connection settings accept an HTTPS backend URL and an optional session-only access token. Calling a private Sites backend from iOS also requires its service-access token; the app sends the supplied access token in the appropriate service header. No credentials are included in backups.
+
+## Nutrition data
+
+- **USDA FoodData Central, SR Legacy:** 7,793 bundled searchable food records, including 312 historical fast-food records. Downloaded from USDA's official public dataset. It is the final **April 2018 SR release**, published into FoodData Central in 2019, not a current restaurant-menu database. Source IDs and a checksum are recorded. Values are per 100 g. No API key is needed.
+- **Open Food Facts:** native camera UPC/EAN scanning and browser camera scanning look up real packaged products through the supported product API. Manual barcode entry remains a fallback. Community data can be incomplete; verify against the label.
+- **Saved foods and sourced labels:** users can add custom food or supplement labels with source URLs, then reuse them.
+- **Official public nutrition sources:** a configured LLM can find and read manufacturer/restaurant pages when databases lack a suitable match. Its extracted values remain explicitly reviewable and are not treated as independently verified facts.
+
+The app does not claim comprehensive current restaurant coverage. Aggregators such as FatSecret or Nutritionix can be added to the database tool behind the same interface when access is available. Do not scrape arbitrary sites as the default strategy or silently replace branded recipes with generic foods.
+
+Reproduce the bundled database:
+
+```sh
+python3 scripts/import-usda.py
+# Or use a previously downloaded official ZIP:
+python3 scripts/import-usda.py /path/to/FoodData_Central_sr_legacy_food_csv_2018-04.zip
 ```
 
-A nutrient above its target cannot compensate for another below target. Energy and macros are separate. This is a **coverage metric**, not an assessment of health, safety, absorption, excess intake, or upper tolerable limits. Historical scores recalculate using current targets.
+The importer uses Vitamin A as RAE, folate as DFE and vitamin D in micrograms. Combined omega-3 is reported only when all four explicit ALA/EPA/DHA/DPA values exist. Missing data remains `null`; zero means a reported zero. See `public/data/usda-manifest.json`.
 
-## Food data and limits
+## Saved meals and supplements
 
-The initial day is explicitly labeled **Sample day**. Sixteen built-in foods contain illustrative composition values, not a verified nutrition database. Use **Start fresh** to remove the sample day, create foods using label/verified values, or look up packaged foods by barcode.
+Library has foods, reusable composite meals and supplements. Build a meal from database or saved components, specify each serving multiplier, then save it under a name such as a usual breakfast. Saved meals snapshot component sources, portions and nutrient values. A partial nutrient total includes known contributions and is marked incomplete.
 
-Open Food Facts values are community supplied and may be incomplete or inaccurate; check against the package. Imported entries use a 100 g serving, so 0.3 servings means 30 g. API `*_100g` values in grams are converted to each nutrient's display units; calories use kcal or converted kJ. Missing nutrients remain `null` (unknown) and contribute zero to computed totals. Unknown values are identified in the contributing-food breakdown. No estimated micronutrients are substituted. Product carbohydrate data may follow regional labeling rules; the API's total-carbohydrate field is preferred when present.
+Supplement labels use the actual nutrient amounts per capsule/tablet/serving, not percent Daily Value. The diary has a separate Supplements section. Today shows food-only coverage alongside combined coverage; historical charts distinguish food from supplement contributions. Logging a supplement is not a dosage recommendation.
 
-Default targets are illustrative, editable starting points, not personalized recommendations. The tracker does not currently implement all essential nutrients, clinical scoring, recipes, exercise integration, weight tracking, account synchronization, camera scanning, or a comprehensive generic-food database. It is a functional first version rather than full Cronometer feature parity.
+Editing a saved food creates a new version and archives the old one, preserving historical diary values. Archiving removes an item from the active library without destroying existing logs.
 
-## Privacy and backups
+## Trends
 
-Diaries, water logs, targets, and saved foods are stored in `localStorage` on the current origin. There is no account backend or cross-device sync. Clearing browser/site data deletes local records. Use JSON export to back up or transfer records. Import validates data and asks before replacing the existing diary. Switching between localhost and the hosted app creates separate storage.
+Select 3, 6 or 12 months and an overall score, energy or individual nutrient. The chart shows monthly averages and the target line. Empty days and initial sample entries are excluded. Per-nutrient averages exclude days with no reported value for that nutrient. The nutrient grid shows monthly coverage, and summaries rank nutrients most often below, met or above target. These are deterministic calculations performed when you open Trends; no model calls, polling jobs, forecasts or ongoing analysis are involved.
 
-The only external food request is an explicit barcode lookup to Open Food Facts. It sends the product code, not the diary or targets. The UI also loads DM Sans and Manrope from Google Fonts, with local fallbacks. There is no analytics or tracking integration.
+Overall score is the mean of 18 capped nutrient-coverage percentages (10 vitamins, 6 minerals, fiber and omega-3), rounded to an integer. Macros and energy are separate. A nutrient above target cannot mask a gap in another. Individual nutrient trends retain percentages above 100 so over-target patterns stay visible. Targets are current, editable examples, not personalized clinical recommendations. Coverage does not assess absorption, health, nutrient interactions or safe upper limits.
 
-## Project structure
+## iOS camera, dictation and data
 
-- `app/main.js`: application views, accessible native dialogs, event handling, persistence.
-- `app/style.css`: responsive design and semantic color/spacing system.
-- `app/data.js`: sample foods, tracked nutrients, example targets, initial sample day.
-- `app/model.js`: pure total, coverage, score, and backup validation functions.
-- `app/open-food-facts.js`: barcode API and nutrition-unit conversion.
-- `tests/`: Node test runner coverage for scoring, servings, import validation, and API adaptation.
+The native app uses the official Capacitor barcode scanner; web preview uses ZXing with the rear-facing camera where available. Camera frames are processed on-device; only decoded barcode digits are sent for product lookup. Camera access is requested only after tapping Scan.
+
+Native dictation uses the app's Swift `NutrientSpeechPlugin` with Apple's Speech/AVFoundation APIs. Browser dictation uses the browser's available SpeechRecognition service. Speech recognition may use the device/vendor's recognition service; a transcript is not sent to the nutrition assistant until the user taps Send. Microphone/speech permissions, stop controls and a Preferences privacy manifest are configured. Camera and microphone operation must still be tested on a physical iPhone; a simulator build cannot prove those work on hardware.
+
+Native diary data persists through Capacitor Preferences; web data uses localStorage. Data is local to the device/origin and removed on uninstall or clearing site data. There is no cross-device account sync. Export/import JSON backs up and transfers the diary, targets, saved meals and supplements. Import validates records and asks before replacing data.
+
+The initial **Sample day** and 16 illustrative foods are explicitly labeled. Start fresh removes sample entries. Historical patterns exclude sample entries even if you add real food on the sample date.
 
 ## Data attribution
 
-Barcode product information comes from [Open Food Facts](https://world.openfoodfacts.org), an open database under the [Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/1-0/). Data is retrieved using the [supported v2 product API](https://openfoodfacts.github.io/openfoodfacts-server/api/), without product images. Product data remains subject to its source license; this repository's sample data does not reproduce the Open Food Facts database. Preserve attribution in redistributed data or derived databases and review applicable source terms before distribution.
+USDA FoodData Central data is public domain/CC0. Source: [USDA downloads](https://fdc.nal.usda.gov/download-datasets/). Barcode data comes from [Open Food Facts](https://world.openfoodfacts.org), under [ODbL](https://opendatacommons.org/licenses/odbl/1-0/); preserve attribution and comply with applicable database terms when redistributing derived product data. Web nutrition records retain their original source URLs.
 
-This project is independent and is not affiliated with Cronometer.
+This project is independent and not affiliated with Cronometer or any restaurant or nutrition-data provider.

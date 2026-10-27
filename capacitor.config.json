@@ -1,0 +1,9 @@
+{
+  "appId": "com.kggreco11.nutrient",
+  "appName": "Nutrient",
+  "webDir": "dist/client",
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#f7f8f3"
+  }
+}
