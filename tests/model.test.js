@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {totals,score,coverage,validState} from '../app/model.js';
+import {foods,nutrients,defaultTargets,initialState} from '../app/data.js';
+test('serving quantities scale calories and all nutrients',()=>{const total=totals([{foodId:'oats',quantity:2}]);assert.equal(total.calories,300);assert.equal(total.protein,10);assert.equal(total.magnesium,112);});
+test('an excess cannot offset an unmet nutrient',()=>{const values={...defaultTargets,vitA:defaultTargets.vitA*10,vitC:0};assert.equal(score(values),94);assert.equal(coverage(9000,900),100);});
+test('macros and calories do not affect the nutrient score',()=>{assert.equal(score({...defaultTargets,protein:0,carbs:0,fat:0,calories:0}),100);assert.equal(score({protein:1000,calories:5000}),0);});
+test('missing data contributes zero without NaN',()=>{const custom={id:'custom',calories:100,values:{protein:5,vitA:null}};const total=totals([{foodId:'custom',quantity:.5}],[custom]);assert.equal(total.calories,50);assert.equal(total.protein,2.5);assert.equal(total.vitA,0);assert.equal(score(total),0);});
+test('category scores include only category members',()=>{const v=Object.fromEntries(nutrients.filter(n=>n.group==='Minerals').map(n=>[n.id,n.target]));assert.equal(score(v,defaultTargets,'Minerals'),100);assert.equal(score(v,defaultTargets,'Vitamins'),0);});
+test('empty diaries have zero totals and scores',()=>{assert.equal(totals([]).calories,0);assert.equal(score(totals([])),0);});
+test('sample state and food catalog are internally valid',()=>{assert.ok(validState(initialState()));assert.equal(foods.length,16);assert.equal(nutrients.filter(n=>n.group!=='Macros').length,18);});
+test('backup validation rejects invalid targets, quantities, missing foods and malformed data',()=>{const s=initialState();s.targets.iron=-1;assert.equal(validState(s),false);const s2=initialState();Object.values(s2.days)[0].entries[0].quantity=-5;assert.equal(validState(s2),false);const s3=initialState();Object.values(s3.days)[0].entries[0].foodId='nope';assert.equal(validState(s3),false);assert.equal(validState({}),false);assert.equal(validState(null),false);});
