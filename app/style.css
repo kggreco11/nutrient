@@ -8,3 +8,5 @@
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 .topbar-actions{display:flex;align-items:center;gap:14px}.topbar-actions>.icon-button{width:28px;height:28px}.topbar-actions>.icon-button .icon{width:15px;height:15px}
 .barcode-details{border:1px solid var(--line);border-radius:8px;padding:0 12px;margin:0 0 20px}.barcode-details summary{font-size:10px;padding:12px 0}.barcode-details form{padding:0 0 12px}.barcode-details form>label{font-size:10px;color:var(--secondary)}.barcode-details form>div{display:flex;gap:10px;margin:8px 0}.barcode-details input{background:var(--canvas);border:1px solid var(--line);border-radius:6px;padding:9px 12px;min-width:0;flex:1;font-size:12px}.barcode-details p{font-size:9px;color:var(--muted)}#barcode-status{color:#9b6947;margin-top:5px}
+/* Allow long meal descriptions to shrink inside narrow grid columns. */
+.lower-grid>*,.right-stack>*{min-width:0}
