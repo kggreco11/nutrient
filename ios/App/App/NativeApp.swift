@@ -24,20 +24,36 @@ struct NutrientAppView: View {
     }
   }
 }
-struct ScoreRing: View {
-  let score: Double
+let calorieAccent = Color(
+  uiColor: UIColor {
+    $0.userInterfaceStyle == .dark
+      ? UIColor(red: 0.96, green: 0.75, blue: 0.51, alpha: 1)
+      : UIColor(red: 0.60, green: 0.32, blue: 0.11, alpha: 1)
+  })
+struct DashboardRing: View {
+  let title: String
+  let value: Double
+  let target: Double
+  let unit: String
+  let detail: String
+  let color: Color
   var body: some View {
-    ZStack {
-      Circle().stroke(nutrientGreen.opacity(0.14), lineWidth: 10)
-      Circle().trim(from: 0, to: min(1, max(0, score / 100))).stroke(
-        nutrientGreen, style: StrokeStyle(lineWidth: 10, lineCap: .round)
-      ).rotationEffect(.degrees(-90))
-      VStack(spacing: 0) {
-        Text(number(score)).font(.system(.largeTitle, design: .rounded).weight(.semibold))
-        Text("/ 100").font(.caption).foregroundStyle(.secondary)
-      }
-    }.frame(width: 86, height: 86).padding(8).accessibilityElement(children: .ignore)
-      .accessibilityLabel("Nutrient score, \(Int(score)) out of 100")
+    VStack(spacing: 12) {
+      Text(title).font(.subheadline.weight(.semibold)).multilineTextAlignment(.center)
+      ZStack {
+        Circle().stroke(color.opacity(0.18), lineWidth: 10)
+        Circle().trim(from: 0, to: min(1, max(0, value / target))).stroke(
+          color, style: StrokeStyle(lineWidth: 10, lineCap: .round)
+        ).rotationEffect(.degrees(-90))
+        VStack(spacing: 2) {
+          Text(number(value)).font(.system(.title2, design: .rounded).weight(.bold))
+            .minimumScaleFactor(0.75).lineLimit(1)
+          Text(unit).font(.subheadline).foregroundStyle(.secondary)
+        }.padding(10)
+      }.frame(width: 106, height: 106)
+      Text(detail).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+    }.frame(maxWidth: .infinity).accessibilityElement(children: .ignore).accessibilityLabel(
+      "\(title), \(number(value)) \(unit), \(detail)")
   }
 }
 struct NativeToday: View {
@@ -55,27 +71,31 @@ struct NativeToday: View {
     NavigationStack {
       List {
         Section {
-          HStack(spacing: 16) {
-            ScoreRing(score: store.score())
-            VStack(alignment: .leading, spacing: 6) {
-              Text("Nutrient coverage").font(.headline)
-              Text(
-                "\(tracked.filter{store.reported($0.id) && store.total($0.id) >= (store.state.targets[$0.id] ?? $0.target)}.count) of \(tracked.count) targets met"
-              ).foregroundStyle(.secondary)
-              Text("\(number(store.total("calories"))) / \(number(store.state.calorieTarget)) kcal")
-                .font(.subheadline)
-            }
-          }
-          HStack(spacing: 16) {
-            ForEach(["protein", "carbs", "fat"], id: \.self) { id in
-              VStack(alignment: .leading, spacing: 5) {
-                Text(id == "carbs" ? "Carbs" : id.capitalized).font(.subheadline).foregroundStyle(
+          HStack(alignment: .top, spacing: 20) {
+            DashboardRing(
+              title: "Nutrient coverage", value: store.score(), target: 100, unit: "%",
+              detail:
+                "\(tracked.filter{store.reported($0.id) && store.total($0.id) >= (store.state.targets[$0.id] ?? $0.target)}.count) of \(tracked.count) targets met",
+              color: nutrientGreen)
+            DashboardRing(
+              title: "Calories", value: store.total("calories"), target: store.state.calorieTarget,
+              unit: "kcal", detail: "of \(number(store.state.calorieTarget)) kcal",
+              color: calorieAccent)
+          }.padding(.vertical, 8)
+          ForEach(["protein", "carbs", "fat"], id: \.self) { id in
+            let value = store.total(id)
+            let target = store.state.targets[id] ?? 1
+            VStack(alignment: .leading, spacing: 10) {
+              HStack {
+                Text(id == "carbs" ? "Carbs" : id.capitalized).font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("\(number(value)) / \(number(target)) g").font(.subheadline).foregroundStyle(
                   .secondary)
-                Text("\(number(store.total(id))) / \(number(store.state.targets[id] ?? 0)) g").font(
-                  .subheadline.weight(.semibold))
-              }.frame(maxWidth: .infinity, alignment: .leading)
-            }
-          }.padding(.vertical, 6)
+              }
+              ProgressView(value: min(value / target, 1)).tint(nutrientGreen).scaleEffect(
+                x: 1, y: 1.7, anchor: .center)
+            }.padding(.vertical, 7)
+          }
         }
         Section {
           Picker("Show", selection: $group) {

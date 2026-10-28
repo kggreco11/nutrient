@@ -8,7 +8,7 @@ The default provider is OpenRouter with model `deepseek/deepseek-v4.1-flash`. On
 
 The database tool searches the saved library before the bundled USDA SR Legacy dataset. Search outputs contain immutable IDs, serving bases, provenance and nutrition values. The model can refine database keywords; it must ask users about materially different preparations, brands, components or amounts instead of silently choosing.
 
-Barcode lookup uses Open Food Facts and keeps absent fields null. Restaurant coverage is provider dependent. Current branded recipes should not be silently substituted with historical USDA or generic approximations.
+Barcode lookup uses Open Food Facts and keeps absent fields null. Restaurant coverage is provider dependent. Current branded recipes should not be silently substituted with historical USDA or generic approximations. The user explicitly permits clearly labeled closest-food estimates: `estimatedFor` and `matchReason` attach the intended product and comparison rationale to a distinct estimate record while retaining retrieved source values. Exact-source lookup is still available on request.
 
 `request_web_fallback` fails until at least one database lookup has occurred. Once enabled, the next model call can use OpenRouter's web-search server tool and page/PDF fetch tool. Search is limited to three results per call/two searches, and page fetch to three calls/6,000 content tokens per request. The system prompt requires official sources and fetching the underlying page before nutrition extraction. These are model/provider behaviors; only a live evaluation can establish reliable adherence, and a missing key prevents that evaluation.
 

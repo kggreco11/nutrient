@@ -42,7 +42,8 @@ export function personalSupplements(nutrients) {
   ];
 }
 export function migratePersonalTargets(state, supplements = []) {
-  if (state.personalTargetVersion === 1) return false;
+  if (state.personalTargetVersion === 2) return false;
+  Object.assign(state.targets, { protein: 160, carbs: 500, fat: 95 });
   const old = {
     protein: 100,
     carbs: 275,
@@ -57,6 +58,6 @@ export function migratePersonalTargets(state, supplements = []) {
   for (const food of supplements)
     if (!state.customFoods.some((f) => f.id === food.id))
       state.customFoods.push(structuredClone(food));
-  state.personalTargetVersion = 1;
+  state.personalTargetVersion = 2;
   return true;
 }

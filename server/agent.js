@@ -47,6 +47,16 @@ const tools = [
           type: "object",
           properties: {
             foodId: { type: "string" },
+            estimatedFor: {
+              type: "string",
+              description:
+                "User food/product represented by this closest database match; omit for exact matches.",
+            },
+            matchReason: {
+              type: "string",
+              description:
+                "Brief reason this is a comparable food or preparation.",
+            },
             quantity: num,
             webFood: {
               type: "object",
@@ -122,6 +132,35 @@ export function validateProposal(raw, records, citations) {
       const food = records.get(item.foodId);
       if (!food)
         throw Error("Search the database for this food before proposing it.");
+      if (item.estimatedFor != null) {
+        if (
+          typeof item.estimatedFor !== "string" ||
+          !item.estimatedFor.trim() ||
+          item.estimatedFor.length > 150 ||
+          typeof item.matchReason !== "string" ||
+          !item.matchReason.trim() ||
+          item.matchReason.length > 500 ||
+          food.kind === "supplement"
+        )
+          throw Error(
+            "A food estimate needs a product name and comparison reason. Supplement doses require a matching label.",
+          );
+        return {
+          food: {
+            ...food,
+            id: "estimate-" + crypto.randomUUID(),
+            name: item.estimatedFor.trim() + " (estimate)",
+            source:
+              "Closest match: " +
+              food.name +
+              " · " +
+              (food.source || "Database"),
+            evidence: item.matchReason,
+            retrievedAt: new Date().toISOString(),
+          },
+          quantity: item.quantity,
+        };
+      }
       return { food, quantity: item.quantity };
     }
     const f = item.webFood,

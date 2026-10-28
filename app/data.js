@@ -675,7 +675,7 @@ export function initialState() {
     version: 1,
     targets: { ...defaultTargets },
     calorieTarget: personalCalorieTarget,
-    personalTargetVersion: 1,
+    personalTargetVersion: 2,
     waterTarget: 8,
     customFoods: personalSupplements(nutrients),
     days: {

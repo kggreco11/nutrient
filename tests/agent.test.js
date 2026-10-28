@@ -203,3 +203,45 @@ test("empty provider output is a retryable service error, never a fabricated cla
     /empty|complete|response/i,
   );
 });
+test("closest product estimates retain retrieved nutrition and provenance without changing the original record", () => {
+  const food = foods[0];
+  const original = structuredClone(food);
+  const proposal = validateProposal(
+    [
+      {
+        foodId: food.id,
+        quantity: 1.5,
+        estimatedFor: "Neighborhood oat porridge",
+        matchReason:
+          "Same rolled oats prepared in water; user supplied the weight.",
+      },
+    ],
+    new Map([[food.id, food]]),
+    new Set(),
+  );
+  assert.match(proposal[0].food.id, /^estimate-/);
+  assert.match(proposal[0].food.name, /estimate/);
+  assert.match(proposal[0].food.source, /Closest match/);
+  assert.deepEqual(proposal[0].food.values, food.values);
+  assert.equal(proposal[0].quantity, 1.5);
+  assert.deepEqual(food, original);
+  assert.throws(
+    () =>
+      validateProposal(
+        [{ foodId: food.id, quantity: 1, estimatedFor: "Other food" }],
+        new Map([[food.id, food]]),
+        new Set(),
+      ),
+    /reason/,
+  );
+});
+test("nullable estimate metadata on an exact match does not cause a tool retry or invent an estimate", () => {
+  const food = foods[0];
+  const result = validateProposal(
+    [{ foodId: food.id, quantity: 1, estimatedFor: null, matchReason: null }],
+    new Map([[food.id, food]]),
+    new Set(),
+  );
+  assert.equal(result[0].food.id, food.id);
+  assert.equal(result[0].food, food);
+});

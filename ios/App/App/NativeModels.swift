@@ -150,7 +150,7 @@ func number(_ value: Double) -> String {
       state = NativeState(
         version: 1, targets: seed.targets, calorieTarget: seed.calorieTarget ?? 3500,
         waterTarget: 8, customFoods: seed.supplements ?? [],
-        days: [:], referenceTargetVersion: 1, personalTargetVersion: 1)
+        days: [:], referenceTargetVersion: 1, personalTargetVersion: 2)
       if let existing {
         let recovery = directory.appendingPathComponent(
           "nutrient-recovery-" + UUID().uuidString + ".json")
@@ -188,8 +188,11 @@ func number(_ value: Double) -> String {
         state.customFoods[i].values[n.id] = .some(nil)
       }
     }
-    if state.personalTargetVersion != 1 {
+    if state.personalTargetVersion != 2 {
       if state.calorieTarget == 2200 { state.calorieTarget = 3500 }
+      state.targets["protein"] = 160
+      state.targets["carbs"] = 500
+      state.targets["fat"] = 95
       let previous: [String: Double] = [
         "protein": 100, "carbs": 275, "fat": 78, "b6": 1.3, "b12": 2.4, "vitD": 15,
       ]
@@ -199,7 +202,7 @@ func number(_ value: Double) -> String {
       for food in supplements where !state.customFoods.contains(where: { $0.id == food.id }) {
         state.customFoods.append(food)
       }
-      state.personalTargetVersion = 1
+      state.personalTargetVersion = 2
     }
     return state
   }
