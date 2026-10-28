@@ -505,6 +505,8 @@ main {
   height: 14px;
 }
 .score-card {
+  container-type: inline-size;
+  min-width: 0;
   padding: 23px 26px 0;
   background: #eff2e5;
   overflow: hidden;
@@ -515,6 +517,7 @@ main {
 }
 .score-content {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 28px;
   padding: 22px 0 26px;
@@ -571,6 +574,9 @@ main {
   margin-top: 8px;
 }
 .score-copy {
+  flex: 1 1 220px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   max-width: 230px;
 }
 .pill {
@@ -3860,5 +3866,73 @@ textarea {
   }
   #toast {
     bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* The score panel can be narrow even when the window is wide. */
+@container (max-width: 480px) {
+  .score-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 22px;
+  }
+  .score-ring {
+    align-self: center;
+  }
+  .score-copy {
+    flex: none;
+    max-width: none;
+  }
+  .score-copy .text-button {
+    text-align: left;
+    white-space: normal;
+  }
+}
+
+/* Five clear destinations on iPhone, with secondary screens in More. */
+.sidebar .mobile-nav {
+  display: none;
+}
+.more-menu {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+.more-menu .button {
+  justify-content: flex-start;
+  min-height: 56px;
+  font-size: 1.0625rem;
+}
+.more-menu .button > .icon:last-child {
+  margin-left: auto;
+}
+.more-glyph {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  letter-spacing: 2px;
+  font-weight: 700;
+}
+@media (max-width: 700px) {
+  .sidebar .desktop-nav {
+    display: none;
+  }
+  .sidebar .mobile-nav {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    padding: 6px 8px;
+  }
+  .mobile-nav .nav-item {
+    min-width: 0;
+    width: 100%;
+    padding: 6px 0;
+    gap: 5px;
+    font-size: 0.875rem;
+    line-height: 1.2;
+  }
+  .mobile-nav .nav-item > span {
+    white-space: nowrap;
   }
 }

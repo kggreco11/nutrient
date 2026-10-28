@@ -160,7 +160,19 @@ function shell() {
     "Trends",
   ];
   document.querySelector("#app").innerHTML = `
-<aside class="sidebar"><a class="brand" href="#overview" aria-label="Nutrient home"><span class="brand-mark">${icon("leaf")}</span>nutrient<span class="brand-dot">.</span></a><div class="workspace-label">YOUR DAILY PRACTICE</div><nav aria-label="Main navigation">${nav.map((n, i) => `<button class="nav-item ${view === n ? "active" : ""}" data-view="${n}">${icon(["dashboard", "diary", "chat", "library", "nutrients", "trends"][i])}<span>${n}</span>${view === n ? '<span class="nav-dot"></span>' : ""}</button>`).join("")}</nav><div class="sidebar-bottom"><div class="free-note">${icon("leaf")}<strong>Good nutrition.<br>Open to everyone.</strong><p>Nutrient insights for everyone.<br>Always free.</p><span>NO PREMIUM REQUIRED ${icon("check")}</span></div><button class="nav-item ${view === "Settings" ? "active" : ""}" data-view="Settings">${icon("settings")} Targets & settings</button><div class="profile"><span class="avatar">Y</span><div><strong>Your personal space</strong><small>Stored on this device</small></div><span class="online-dot"></span></div></div></aside>
+<aside class="sidebar"><a class="brand" href="#overview" aria-label="Nutrient home"><span class="brand-mark">${icon("leaf")}</span>nutrient<span class="brand-dot">.</span></a><div class="workspace-label">YOUR DAILY PRACTICE</div><nav class="desktop-nav" aria-label="Main navigation">${nav.map((n, i) => `<button class="nav-item ${view === n ? "active" : ""}" data-view="${n}">${icon(["dashboard", "diary", "chat", "library", "nutrients", "trends"][i])}<span>${n}</span>${view === n ? '<span class="nav-dot"></span>' : ""}</button>`).join("")}</nav><nav class="mobile-nav" aria-label="Main navigation">${[
+    ["Overview", "Today", "dashboard"],
+    ["Food diary", "Diary", "diary"],
+    ["Chat", "Chat", "chat"],
+    ["Trends", "Trends", "trends"],
+  ]
+    .map(
+      ([target, label, glyph]) =>
+        `<button class="nav-item ${view === target ? "active" : ""}" data-view="${target}" ${view === target ? 'aria-current="page"' : ""}>${icon(glyph)}<span>${label}</span></button>`,
+    )
+    .join(
+      "",
+    )}<button class="nav-item ${["Library", "Nutrients", "Settings"].includes(view) ? "active" : ""}" data-action="more" aria-haspopup="dialog"><span class="more-glyph" aria-hidden="true">•••</span><span>More</span></button></nav><div class="sidebar-bottom"><div class="free-note">${icon("leaf")}<strong>Good nutrition.<br>Open to everyone.</strong><p>Nutrient insights for everyone.<br>Always free.</p><span>NO PREMIUM REQUIRED ${icon("check")}</span></div><button class="nav-item ${view === "Settings" ? "active" : ""}" data-view="Settings">${icon("settings")} Targets & settings</button><div class="profile"><span class="avatar">Y</span><div><strong>Your personal space</strong><small>Stored on this device</small></div><span class="online-dot"></span></div></div></aside>
 <div class="main-shell"><header class="topbar"><span class="breadcrumb">My workspace <span>/</span> <strong>${view}</strong></span><div class="topbar-actions"><span class="private-badge"><i></i> Local & private</span><button class="icon-button" data-view="Settings" aria-label="Targets and settings">${icon("settings")}</button></div></header><main id="content"><div class="page-heading"><div><p class="eyebrow">A LITTLE MORE BALANCE, EVERY DAY</p><h1>${{ Overview: "Your daily picture.", "Food diary": "One bite at a time.", Nutrients: "The details that matter.", Trends: "Small steps. A fuller picture.", Settings: "Make it yours.", Chat: "Tell us what’s on your plate.", Library: "Your everyday favorites." }[view]}</h1><p class="subtitle">${{ Overview: "Look beyond calories. See what’s nourishing you.", "Food diary": "A simple record of what nourishes you.", Nutrients: "Every nutrient, with room to understand more.", Trends: "See how your nutrient coverage changes over time.", Settings: "Your targets, your food, your data.", Chat: "Describe a meal. Find its components. Make it yours.", Library: "Meals, foods, and supplements. Ready when you are." }[view]}</p></div>${view !== "Settings" ? '<button class="button primary" data-action="add">' + icon("plus") + " Log food</button>" : ""}</div>
 ${view !== "Settings" ? `<div class="day-toolbar"><div class="date-control"><button class="icon-button" data-action="prev" aria-label="Previous day">${icon("back")}</button><label class="date-picker">${icon("calendar")}<strong>${dateLabel()}</strong><input type="date" id="date" value="${selectedDate}" aria-label="Choose diary date"></label><button class="icon-button" data-action="next" aria-label="Next day">${icon("arrow")}</button>${selectedDate === localDate() ? '<span class="today-tag">Today</span>' : '<button class="text-button" data-action="today">Today</button>'}</div><div class="day-meta">${day().demo ? '<span class="demo-badge">Sample day</span><button class="text-button" data-action="clear-demo">Start fresh ' + icon("arrow") + "</button>" : `<span>${day().entries.length} foods logged</span>`}</div></div>` : ""}
 <div id="view-content"></div><footer><span>${icon("leaf")} A fuller picture. A little more balance.</span><button class="text-button" data-action="method">How scores work ${icon("info")}</button></footer></main></div>`;
@@ -693,6 +705,7 @@ document.addEventListener("click", (event) => {
     return;
   }
   if (el.dataset.view) {
+    if (modal.open) closeModal();
     view = el.dataset.view;
     shell();
     window.scrollTo(0, 0);
@@ -762,6 +775,10 @@ document.addEventListener("click", (event) => {
     shell();
   }
   if (action === "new-meal") builderDialog();
+  if (action === "more")
+    showModal(
+      `<h2 id="modal-title">More</h2><nav class="more-menu" aria-label="More destinations"><button class="button secondary" data-view="Library">${icon("library")} Library ${icon("arrow")}</button><button class="button secondary" data-view="Nutrients">${icon("nutrients")} Nutrients ${icon("arrow")}</button><button class="button secondary" data-view="Settings">${icon("settings")} Targets & settings ${icon("arrow")}</button></nav>`,
+    );
   if (action === "method") method();
   if (action === "target-settings") {
     closeModal();
