@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 struct NutrientDefinition: Codable, Identifiable {
   let id: String
@@ -92,7 +93,13 @@ struct MonthAverage: Identifiable {
   var id: Date { date }
 }
 let nativeMeals = ["Breakfast", "Lunch", "Dinner", "Snacks", "Supplements"]
-let nutrientGreen = Color(red: 0.29, green: 0.39, blue: 0.23)
+let nutrientGreen = Color(
+  uiColor: UIColor { traits in
+    traits.userInterfaceStyle == .dark
+      ? UIColor(red: 0.72, green: 0.84, blue: 0.60, alpha: 1)
+      : UIColor(red: 0.29, green: 0.39, blue: 0.23, alpha: 1)
+  })
+let nutrientOnGreen = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? .black : .white })
 func number(_ value: Double) -> String {
   value.formatted(.number.precision(.fractionLength(0...(value < 10 ? 1 : 0))))
 }
@@ -111,19 +118,24 @@ func number(_ value: Double) -> String {
   let sampleFoods: [NativeFood]
   let backend = NativeBackend()
   private let dataURL: URL
-  init() {
-    let seedURL = Bundle.main.url(forResource: "NativeSeed", withExtension: "json")!
+  private let mirrorPreferences: Bool
+  init(seedURL: URL? = nil, storageURL: URL? = nil, mirrorPreferences: Bool = true) {
+    self.mirrorPreferences = mirrorPreferences
+    let seedURL = seedURL ?? Bundle.main.url(forResource: "NativeSeed", withExtension: "json")!
     let seed = try! JSONDecoder().decode(NativeSeed.self, from: Data(contentsOf: seedURL))
     nutrients = seed.nutrients
     sampleFoods = seed.foods
     let directory = FileManager.default.urls(
       for: .applicationSupportDirectory, in: .userDomainMask)[0]
     try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    dataURL = directory.appendingPathComponent("nutrient-native.json")
+    dataURL = storageURL ?? directory.appendingPathComponent("nutrient-native.json")
     let existing =
       (try? Data(contentsOf: dataURL))
-      ?? UserDefaults.standard.string(forKey: "CapacitorStorage.nutrient-v1")?.data(using: .utf8)
-    if let existing, let restored = try? JSONDecoder().decode(NativeState.self, from: existing),
+      ?? (mirrorPreferences
+        ? UserDefaults.standard.string(forKey: "CapacitorStorage.nutrient-v1")?.data(using: .utf8)
+        : nil)
+    if let existing, let decoded = try? JSONDecoder().decode(NativeState.self, from: existing),
+      let restored = Self.expanded(decoded, nutrients: seed.nutrients),
       Self.valid(restored, nutrients: seed.nutrients, foods: seed.foods)
     {
       state = restored
@@ -156,6 +168,60 @@ func number(_ value: Double) -> String {
       state.pendingMeal = nil
     }
     backend.bootstrap()
+  }
+  static func expanded(_ original: NativeState, nutrients: [NutrientDefinition]) -> NativeState? {
+    var state = original
+    for n in nutrients where state.targets[n.id] == nil { state.targets[n.id] = n.target }
+    for i in state.customFoods.indices {
+      for n in nutrients where !state.customFoods[i].values.keys.contains(n.id) {
+        state.customFoods[i].values[n.id] = .some(nil)
+      }
+    }
+    return state
+  }
+  func updateEntry(
+    _ original: DiaryEntry, from sourceDate: Date, to destinationDate: Date, quantity: Double,
+    meal: String
+  ) throws {
+    guard quantity.isFinite, quantity > 0, quantity <= 100, nativeMeals.contains(meal),
+      let food = food(original.foodId), !food.isSupplement || meal == "Supplements"
+    else {
+      throw NSError(
+        domain: "Nutrient", code: 1,
+        userInfo: [NSLocalizedDescriptionKey: "Enter a valid portion and meal."])
+    }
+    let sourceKey = key(sourceDate)
+    let destinationKey = key(destinationDate)
+    guard var source = state.days[sourceKey],
+      let index = source.entries.firstIndex(where: { $0.id == original.id })
+    else {
+      throw NSError(
+        domain: "Nutrient", code: 1,
+        userInfo: [NSLocalizedDescriptionKey: "This entry no longer exists."])
+    }
+    var updated = source.entries[index]
+    updated.quantity = quantity
+    updated.meal = meal
+    if sourceKey == destinationKey {
+      source.entries[index] = updated
+      state.days[sourceKey] = source
+    } else {
+      source.entries.remove(at: index)
+      var destination = state.days[destinationKey] ?? DiaryDay()
+      destination.entries.append(updated)
+      state.days[sourceKey] = source
+      state.days[destinationKey] = destination
+    }
+    save()
+  }
+  func reported(_ nutrient: String) -> Bool {
+    day.entries.contains { food($0.foodId)?.value(nutrient) != nil }
+  }
+  func incomplete(_ nutrient: String) -> Bool {
+    day.entries.contains {
+      guard let food = food($0.foodId) else { return true }
+      return food.value(nutrient) == nil || food.partialNutrients?.contains(nutrient) == true
+    }
   }
   static func valid(_ state: NativeState, nutrients: [NutrientDefinition], foods: [NativeFood])
     -> Bool
@@ -194,8 +260,10 @@ func number(_ value: Double) -> String {
     do {
       let data = try JSONEncoder().encode(state)
       try data.write(to: dataURL, options: .atomic)
-      UserDefaults.standard.set(
-        String(data: data, encoding: .utf8), forKey: "CapacitorStorage.nutrient-v1")
+      if mirrorPreferences {
+        UserDefaults.standard.set(
+          String(data: data, encoding: .utf8), forKey: "CapacitorStorage.nutrient-v1")
+      }
     } catch { self.error = "Couldn't save. Export a backup before closing the app." }
   }
   func total(_ nutrient: String, entries: [DiaryEntry]? = nil) -> Double {
@@ -282,6 +350,23 @@ func number(_ value: Double) -> String {
       database = try await Task.detached {
         try JSONDecoder().decode([NativeFood].self, from: Data(contentsOf: url))
       }.value
+      let indexed = Dictionary(uniqueKeysWithValues: database.map { ($0.id, $0) })
+      let added = [
+        "b3", "b5", "biotin", "choline", "phosphorus", "sodium", "chloride", "copper", "iodine",
+        "manganese", "molybdenum", "chromium", "fluoride",
+      ]
+      var changed = false
+      for i in state.customFoods.indices where state.customFoods[i].source == "USDA SR Legacy" {
+        if let record = indexed[state.customFoods[i].id] {
+          for id in added where state.customFoods[i].value(id) == nil {
+            if let value = record.value(id) {
+              state.customFoods[i].values[id] = .some(value)
+              changed = true
+            }
+          }
+        }
+      }
+      if changed { save() }
     } catch { databaseError = "Couldn't load the food database." }
   }
   func search(_ query: String) -> [NativeFood] {
@@ -383,7 +468,8 @@ func number(_ value: Double) -> String {
     return url
   }
   func restore(_ data: Data) throws {
-    let candidate = try JSONDecoder().decode(NativeState.self, from: data)
+    let decoded = try JSONDecoder().decode(NativeState.self, from: data)
+    let candidate = Self.expanded(decoded, nutrients: nutrients)!
     guard Self.valid(candidate, nutrients: nutrients, foods: sampleFoods) else {
       throw NSError(
         domain: "Nutrient", code: 1,

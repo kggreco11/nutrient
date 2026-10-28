@@ -12,6 +12,19 @@ const fields = {
   vitK: "vitamin-k",
   b1: "vitamin-b1",
   b2: "vitamin-b2",
+  b3: "vitamin-pp",
+  b5: "pantothenic-acid",
+  biotin: "biotin",
+  choline: "choline",
+  phosphorus: "phosphorus",
+  sodium: "sodium",
+  chloride: "chloride",
+  copper: "copper",
+  iodine: "iodine",
+  manganese: "manganese",
+  molybdenum: "molybdenum",
+  chromium: "chromium",
+  fluoride: "fluoride",
   b6: "vitamin-b6",
   b12: "vitamin-b12",
   folate: "vitamin-b9",
@@ -40,7 +53,8 @@ export function productToFood(product, barcode) {
     );
   const values = Object.fromEntries(
     nutrients.map((item) => {
-      const raw = number(n[fields[item.id] + "_100g"]);
+      const raw =
+        item.id === "b3" ? null : number(n[fields[item.id] + "_100g"]);
       const factor = item.unit === "mg" ? 1000 : item.unit === "µg" ? 1e6 : 1;
       return [
         item.id,

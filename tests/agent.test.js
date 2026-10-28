@@ -184,3 +184,22 @@ test("API checks authentication and cross-origin access before model execution",
     model: DEFAULT_MODEL,
   });
 });
+test("empty provider output is a retryable service error, never a fabricated clarification", async () => {
+  await assert.rejects(
+    runAgent({
+      messages: [{ role: "user", content: "150g roasted chicken breast" }],
+      database: foods,
+      apiKey: "test-only",
+      fetchImpl: async () =>
+        Response.json({
+          choices: [
+            {
+              finish_reason: "length",
+              message: { role: "assistant", content: "" },
+            },
+          ],
+        }),
+    }),
+    /empty|complete|response/i,
+  );
+});

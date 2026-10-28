@@ -261,7 +261,8 @@ export async function runAgent({
           model,
           messages: history,
           tools: available,
-          max_tokens: 2000,
+          max_tokens: 3000,
+          reasoning: { effort: "none" },
           temperature: 0.1,
         }),
         signal: AbortSignal.timeout(60000),
@@ -287,16 +288,23 @@ export async function runAgent({
       const url = canonicalUrl(a.url_citation?.url);
       if (url) citations.add(url);
     }
-    if (!message.tool_calls?.length)
+    if (!message.tool_calls?.length) {
+      if (typeof message.content !== "string" || !message.content.trim()) {
+        throw Object.assign(
+          Error(
+            "The model returned an empty response. Retry your message; your food details have been kept.",
+          ),
+          { status: 502 },
+        );
+      }
       return {
-        reply:
-          message.content ||
-          "Please tell me a little more about the food and amount.",
+        reply: message.content,
         proposal,
         trace,
         model,
         sources: [...citations],
       };
+    }
     history.push(message);
     for (const call of message.tool_calls) {
       let output;

@@ -96,13 +96,21 @@ final class NativeBackend {
       "fiber": ("fiber", 1), "vitA": ("vitamin-a", 1_000_000), "vitC": ("vitamin-c", 1000),
       "vitD": ("vitamin-d", 1_000_000), "vitE": ("vitamin-e", 1000),
       "vitK": ("vitamin-k", 1_000_000), "b1": ("vitamin-b1", 1000), "b2": ("vitamin-b2", 1000),
-      "b6": ("vitamin-b6", 1000), "b12": ("vitamin-b12", 1_000_000),
+      "b6": ("vitamin-b6", 1000),
+      "b5": ("pantothenic-acid", 1000), "biotin": ("biotin", 1_000_000),
+      "choline": ("choline", 1000),
+      "phosphorus": ("phosphorus", 1000), "sodium": ("sodium", 1000),
+      "chloride": ("chloride", 1000),
+      "copper": ("copper", 1000), "iodine": ("iodine", 1_000_000), "manganese": ("manganese", 1000),
+      "molybdenum": ("molybdenum", 1_000_000), "chromium": ("chromium", 1_000_000),
+      "fluoride": ("fluoride", 1000), "b12": ("vitamin-b12", 1_000_000),
       "folate": ("folates", 1_000_000), "calcium": ("calcium", 1000), "iron": ("iron", 1000),
       "magnesium": ("magnesium", 1000), "potassium": ("potassium", 1000), "zinc": ("zinc", 1000),
       "selenium": ("selenium", 1_000_000), "omega3": ("omega-3-fat", 1),
     ]
     var values: [String: Double?] = [:]
     for (id, entry) in map { values[id] = .some(value(entry.0, scale: entry.1)) }
+    values["b3"] = .some(nil)  // Product niacin alone does not establish niacin equivalents.
     let name = product["product_name"] as? String ?? "Packaged food"
     return NativeFood(
       id: "off-" + code, name: name, serving: "100 g", calories: calories, values: values,

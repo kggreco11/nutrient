@@ -36,17 +36,20 @@ struct ScoreRing: View {
         Text(number(score)).font(.system(.largeTitle, design: .rounded).weight(.semibold))
         Text("/ 100").font(.caption).foregroundStyle(.secondary)
       }
-    }.frame(width: 110, height: 110).padding(8).accessibilityElement(children: .ignore)
+    }.frame(width: 86, height: 86).padding(8).accessibilityElement(children: .ignore)
       .accessibilityLabel("Nutrient score, \(Int(score)) out of 100")
   }
 }
 struct NativeToday: View {
   @EnvironmentObject var store: NutrientStore
   @State private var add = false
-  var met: Int {
-    store.nutrients.filter {
-      $0.group != "Macros" && store.total($0.id) >= (store.state.targets[$0.id] ?? $0.target)
-    }.count
+  @State private var group = "Overview"
+  var tracked: [NutrientDefinition] { store.nutrients.filter { $0.group != "Macros" } }
+  var shown: [NutrientDefinition] {
+    group == "Overview"
+      ? ["vitD", "choline", "chromium", "b6", "b12", "magnesium"].compactMap { id in
+        tracked.first { $0.id == id }
+      } : tracked.filter { $0.group == group }
   }
   var body: some View {
     NavigationStack {
@@ -54,48 +57,39 @@ struct NativeToday: View {
         Section {
           HStack(spacing: 16) {
             ScoreRing(score: store.score())
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
               Text("Nutrient coverage").font(.headline)
-              Text("\(met) of 18 targets met").foregroundStyle(.secondary)
-              NavigationLink("See nutrients") { NativeNutrients() }.font(.subheadline)
+              Text(
+                "\(tracked.filter{store.reported($0.id) && store.total($0.id) >= (store.state.targets[$0.id] ?? $0.target)}.count) of \(tracked.count) targets met"
+              ).foregroundStyle(.secondary)
+              Text("\(number(store.total("calories"))) / \(number(store.state.calorieTarget)) kcal")
+                .font(.subheadline)
             }
-          }.padding(.vertical, 8)
-        }
-        Section("Energy") {
-          HStack(alignment: .firstTextBaseline) {
-            Text(number(store.total("calories"))).font(.title.bold())
-            Text("/ \(number(store.state.calorieTarget)) kcal").foregroundStyle(.secondary)
           }
-          ProgressView(value: min(store.total("calories") / store.state.calorieTarget, 1)).tint(
-            nutrientGreen)
-          HStack(alignment: .top, spacing: 12) {
+          HStack(spacing: 16) {
             ForEach(["protein", "carbs", "fat"], id: \.self) { id in
               VStack(alignment: .leading, spacing: 5) {
                 Text(id == "carbs" ? "Carbs" : id.capitalized).font(.subheadline).foregroundStyle(
                   .secondary)
-                Text("\(number(store.total(id))) g").font(.headline)
-                Text("of \(number(store.state.targets[id] ?? 0)) g").font(.caption).foregroundStyle(
-                  .secondary)
+                Text("\(number(store.total(id))) / \(number(store.state.targets[id] ?? 0)) g").font(
+                  .subheadline.weight(.semibold))
               }.frame(maxWidth: .infinity, alignment: .leading)
             }
           }.padding(.vertical, 6)
         }
-        Section("Meals") {
-          ForEach(nativeMeals, id: \.self) { meal in
-            Button {
-              store.tab = 1
-            } label: {
-              HStack {
-                Text(meal).foregroundStyle(.primary)
-                Spacer()
-                let entries = store.day.entries.filter { $0.meal == meal }
-                Text(
-                  entries.isEmpty
-                    ? "No entries" : "\(number(store.total("calories",entries:entries))) kcal"
-                ).foregroundStyle(.secondary)
-                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
-              }
-            }
+        Section {
+          Picker("Show", selection: $group) {
+            ForEach(["Overview", "Vitamins", "Minerals", "Other"], id: \.self) { Text($0) }
+          }
+          ForEach(shown) { NativeNutrientRow(nutrient: $0) }
+          NavigationLink("All \(store.nutrients.count) nutrients") { NativeNutrients() }
+        } header: {
+          Text("Nutrients")
+        }
+        Section("Today's food") {
+          if store.day.entries.isEmpty { Button("Log food") { add = true } }
+          ForEach(store.day.entries) { entry in
+            NativeLoggedEntry(entry: entry, sourceDate: store.date)
           }
         }
         Section("Water") {
@@ -103,18 +97,134 @@ struct NativeToday: View {
             "\(store.day.water) / \(store.state.waterTarget) glasses",
             value: Binding(get: { store.day.water }, set: { store.water($0) }), in: 0...30)
         }
-      }
-      .scrollIndicators(.hidden).navigationTitle("Today")
-      .toolbar {
-        ToolbarItem(placement: .topBarTrailing) {
-          Button {
-            add = true
-          } label: {
-            Image(systemName: "plus")
-          }.accessibilityLabel("Log food")
+      }.scrollIndicators(.hidden).navigationTitle("Today").navigationBarTitleDisplayMode(.inline)
+        .onAppear { store.date = Date() }
+        .toolbar {
+          ToolbarItem(placement: .topBarTrailing) {
+            Button {
+              add = true
+            } label: {
+              Image(systemName: "plus")
+            }.accessibilityLabel("Log food")
+          }
         }
+        .sheet(isPresented: $add) { NativeFoodSearch() }
+    }
+  }
+}
+struct NativeNutrientRow: View {
+  @EnvironmentObject var store: NutrientStore
+  let nutrient: NutrientDefinition
+  var body: some View {
+    let value = store.total(nutrient.id)
+    let target = store.state.targets[nutrient.id] ?? nutrient.target
+    VStack(alignment: .leading, spacing: 7) {
+      HStack(alignment: .firstTextBaseline) {
+        Text(nutrient.name)
+        Spacer()
+        Text(
+          store.reported(nutrient.id)
+            ? "\(number(value)) / \(number(target)) \(nutrient.unit)"
+            : "— / \(number(target)) \(nutrient.unit)"
+        ).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
       }
-      .sheet(isPresented: $add) { NativeFoodSearch() }
+      if store.reported(nutrient.id) {
+        ProgressView(value: min(value / target, 1)).tint(nutrientGreen)
+        if store.incomplete(nutrient.id) {
+          Text("Partial data").font(.caption).foregroundStyle(.secondary)
+        }
+      } else {
+        Text(store.day.entries.isEmpty ? "No food logged" : "Not reported in logged foods").font(
+          .caption
+        ).foregroundStyle(.secondary)
+      }
+    }.padding(.vertical, 4)
+  }
+}
+struct NativeLoggedEntry: View {
+  @EnvironmentObject var store: NutrientStore
+  let entry: DiaryEntry
+  let sourceDate: Date
+  @State private var edit = false
+  var body: some View {
+    if let food = store.food(entry.foodId) {
+      Button {
+        edit = true
+      } label: {
+        HStack(alignment: .top) {
+          VStack(alignment: .leading, spacing: 5) {
+            Text(food.name).foregroundStyle(.primary)
+            Text("\(number(entry.quantity)) × \(food.serving) · \(entry.meal)").font(.subheadline)
+              .foregroundStyle(.secondary)
+          }
+          Spacer()
+          VStack(alignment: .trailing, spacing: 8) {
+            Text("\(number(food.calories*entry.quantity)) kcal").font(.subheadline).foregroundStyle(
+              .secondary)
+            Image(systemName: "pencil").foregroundStyle(nutrientGreen)
+          }
+        }
+      }.buttonStyle(.plain).accessibilityHint("Edit portion, meal, or date")
+        .swipeActions {
+          Button("Remove", role: .destructive) { store.remove(entry) }
+          Button("Edit") { edit = true }.tint(nutrientGreen)
+        }
+        .sheet(isPresented: $edit) { NativeEntryEditor(entry: entry, sourceDate: sourceDate) }
+    }
+  }
+}
+struct NativeEntryEditor: View {
+  @EnvironmentObject var store: NutrientStore
+  @Environment(\.dismiss) var dismiss
+  let entry: DiaryEntry
+  let sourceDate: Date
+  @State private var quantity: Double
+  @State private var meal: String
+  @State private var date: Date
+  @State private var failure: String?
+  init(entry: DiaryEntry, sourceDate: Date) {
+    self.entry = entry
+    self.sourceDate = sourceDate
+    _quantity = State(initialValue: entry.quantity)
+    _meal = State(initialValue: entry.meal)
+    _date = State(initialValue: sourceDate)
+  }
+  var body: some View {
+    NavigationStack {
+      Form {
+        if let food = store.food(entry.foodId) {
+          Section {
+            Text(food.name).font(.headline)
+            LabeledContent("Source serving", value: food.serving)
+            HStack {
+              Text("Servings")
+              Spacer()
+              TextField("Servings", value: $quantity, format: .number).keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+            }
+            LabeledContent("Energy", value: "\(number(food.calories*quantity)) kcal")
+          }
+          Section {
+            Picker("Meal", selection: $meal) {
+              ForEach(food.isSupplement ? ["Supplements"] : nativeMeals, id: \.self) { Text($0) }
+            }
+            DatePicker("Date", selection: $date, displayedComponents: .date)
+          }
+        }
+        if let failure { Text(failure).foregroundStyle(.red) }
+      }.navigationTitle("Edit entry").navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Save") {
+              do {
+                try store.updateEntry(
+                  entry, from: sourceDate, to: date, quantity: quantity, meal: meal)
+                dismiss()
+              } catch { failure = error.localizedDescription }
+            }.disabled(!quantity.isFinite || quantity <= 0 || quantity > 100)
+          }
+        }
     }
   }
 }
@@ -129,21 +239,7 @@ struct NativeDiary: View {
           Section(meal) {
             let entries = store.day.entries.filter { $0.meal == meal }
             if entries.isEmpty { Text("No entries").foregroundStyle(.secondary) }
-            ForEach(entries) { entry in
-              if let food = store.food(entry.foodId) {
-                HStack(alignment: .top) {
-                  VStack(alignment: .leading, spacing: 5) {
-                    Text(food.name)
-                    Text("\(number(entry.quantity)) × \(food.serving)").font(.subheadline)
-                      .foregroundStyle(.secondary)
-                  }
-                  Spacer()
-                  Text("\(number(food.calories*entry.quantity)) kcal").font(.subheadline)
-                    .foregroundStyle(.secondary)
-                }
-                .swipeActions { Button("Remove", role: .destructive) { store.remove(entry) } }
-              }
-            }
+            ForEach(entries) { entry in NativeLoggedEntry(entry: entry, sourceDate: store.date) }
             Button("Add food") { add = true }
           }
         }
@@ -169,17 +265,7 @@ struct NativeNutrients: View {
       ForEach(
         store.nutrients.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) }
       ) { n in
-        let value = store.total(n.id)
-        let target = store.state.targets[n.id] ?? n.target
-        VStack(alignment: .leading, spacing: 8) {
-          HStack {
-            Text(n.name)
-            Spacer()
-            Text("\(number(value)) / \(number(target)) \(n.unit)").font(.subheadline)
-              .foregroundStyle(.secondary)
-          }
-          ProgressView(value: min(value / target, 1)).tint(nutrientGreen)
-        }.padding(.vertical, 5)
+        NativeNutrientRow(nutrient: n)
       }
     }.searchable(text: $query, prompt: "Find a nutrient").scrollIndicators(.hidden).navigationTitle(
       "Nutrients"
@@ -231,7 +317,7 @@ struct NativeChat: View {
               } label: {
                 Label("Review meal", systemImage: "checklist").frame(maxWidth: .infinity).padding(
                   12)
-              }.buttonStyle(.borderedProminent)
+              }.buttonStyle(.borderedProminent).foregroundStyle(nutrientOnGreen)
             }
             Color.clear.frame(height: 1).id("bottom")
           }.padding(16)

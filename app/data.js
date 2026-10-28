@@ -163,6 +163,110 @@ export const nutrients = [
     group: "Other",
     icon: "ω",
   },
+  {
+    id: "b3",
+    name: "Niacin \u00b7 B3",
+    unit: "mg NE",
+    target: 16,
+    group: "Vitamins",
+    icon: "\u25c8",
+  },
+  {
+    id: "b5",
+    name: "Pantothenic acid \u00b7 B5",
+    unit: "mg",
+    target: 5,
+    group: "Vitamins",
+    icon: "\u25c8",
+  },
+  {
+    id: "biotin",
+    name: "Biotin \u00b7 B7",
+    unit: "\u00b5g",
+    target: 30,
+    group: "Vitamins",
+    icon: "\u25c8",
+  },
+  {
+    id: "choline",
+    name: "Choline",
+    unit: "mg",
+    target: 550,
+    group: "Other",
+    icon: "\u25c8",
+  },
+  {
+    id: "phosphorus",
+    name: "Phosphorus",
+    unit: "mg",
+    target: 700,
+    group: "Minerals",
+    icon: "\u25c8",
+  },
+  {
+    id: "sodium",
+    name: "Sodium",
+    unit: "mg",
+    target: 1500,
+    group: "Minerals",
+    icon: "\u25c8",
+  },
+  {
+    id: "chloride",
+    name: "Chloride",
+    unit: "mg",
+    target: 2300,
+    group: "Minerals",
+    icon: "\u25c8",
+  },
+  {
+    id: "copper",
+    name: "Copper",
+    unit: "mg",
+    target: 0.9,
+    group: "Minerals",
+    icon: "\u25c8",
+  },
+  {
+    id: "iodine",
+    name: "Iodine",
+    unit: "\u00b5g",
+    target: 150,
+    group: "Minerals",
+    icon: "\u25c8",
+  },
+  {
+    id: "manganese",
+    name: "Manganese",
+    unit: "mg",
+    target: 2.3,
+    group: "Minerals",
+    icon: "\u25c8",
+  },
+  {
+    id: "molybdenum",
+    name: "Molybdenum",
+    unit: "\u00b5g",
+    target: 45,
+    group: "Minerals",
+    icon: "\u25c8",
+  },
+  {
+    id: "chromium",
+    name: "Chromium",
+    unit: "\u00b5g",
+    target: 35,
+    group: "Minerals",
+    icon: "\u25c8",
+  },
+  {
+    id: "fluoride",
+    name: "Fluoride",
+    unit: "mg",
+    target: 4,
+    group: "Minerals",
+    icon: "\u25c8",
+  },
 ];
 const food = (id, name, serving, emoji, calories, values) => ({
   id,
@@ -542,6 +646,11 @@ export const foods = [
     omega3: 0.7,
   }),
 ];
+// Legacy illustrative records do not report the expanded nutrients.
+for (const food of foods)
+  for (const n of nutrients) {
+    if (!(n.id in food.values)) food.values[n.id] = null;
+  }
 export const meals = ["Breakfast", "Lunch", "Dinner", "Snacks", "Supplements"];
 for (const n of nutrients) {
   if (referenceTargets[n.id] !== undefined) n.target = referenceTargets[n.id];

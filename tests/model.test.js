@@ -10,7 +10,13 @@ test("serving quantities scale calories and all nutrients", () => {
 });
 test("an excess cannot offset an unmet nutrient", () => {
   const values = { ...defaultTargets, vitA: defaultTargets.vitA * 10, vitC: 0 };
-  assert.equal(score(values), 94);
+  assert.equal(
+    score(values),
+    Math.round(
+      (100 * (nutrients.filter((n) => n.group !== "Macros").length - 1)) /
+        nutrients.filter((n) => n.group !== "Macros").length,
+    ),
+  );
   assert.equal(coverage(9000, 900), 100);
 });
 test("macros and calories do not affect the nutrient score", () => {
@@ -48,7 +54,7 @@ test("empty diaries have zero totals and scores", () => {
 test("sample state and food catalog are internally valid", () => {
   assert.ok(validState(initialState()));
   assert.equal(foods.length, 16);
-  assert.equal(nutrients.filter((n) => n.group !== "Macros").length, 18);
+  assert.equal(nutrients.filter((n) => n.group !== "Macros").length, 31);
 });
 test("backup validation rejects invalid targets, quantities, missing foods and malformed data", () => {
   const s = initialState();

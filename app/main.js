@@ -73,6 +73,7 @@ try {
     ? (await Preferences.get({ key: "nutrient-v1" })).value
     : localStorage.getItem("nutrient-v1");
   state = raw ? JSON.parse(raw) : initialState();
+  migrateReferenceTargets(state);
   if (!validState(state)) throw Error("invalid");
 } catch {
   state = initialState();
@@ -227,7 +228,7 @@ function overview() {
     )
     .slice(0, 3);
   return `
-<section class="overview-grid"><article class="card score-card"><div class="card-kicker">NUTRIENT SCORE <button class="icon-button small" data-action="method" aria-label="About nutrient scores">${icon("info")}</button></div><div class="score-content">${ring(s, 174)}<div class="score-copy"><h2>${met} of 18 targets met</h2><button class="text-button" data-view="Nutrients">Explore your nutrients ${icon("arrow")}</button></div></div><div class="score-source-note">Food only: ${score(
+<section class="overview-grid"><article class="card score-card"><div class="card-kicker">NUTRIENT SCORE <button class="icon-button small" data-action="method" aria-label="About nutrient scores">${icon("info")}</button></div><div class="score-content">${ring(s, 174)}<div class="score-copy"><h2>${met} of ${nutrients.filter((n) => n.group !== "Macros").length} targets met</h2><button class="text-button" data-view="Nutrients">Explore your nutrients ${icon("arrow")}</button></div></div><div class="score-source-note">Food only: ${score(
     totals(
       day().entries.filter(
         (e) =>
@@ -236,7 +237,7 @@ function overview() {
       catalog(),
     ),
     state.targets,
-  )}/100 · ${day().entries.filter((e) => foodKind(catalog().find((f) => f.id === e.foodId)) === "supplement").length} supplements logged</div><div class="score-card-foot"><span><i class="dot olive"></i>Daily coverage</span><span>18 nutrients · equally weighted</span></div></article>
+  )}/100 · ${day().entries.filter((e) => foodKind(catalog().find((f) => f.id === e.foodId)) === "supplement").length} supplements logged</div><div class="score-card-foot"><span><i class="dot olive"></i>Daily coverage</span><span>${nutrients.filter((n) => n.group !== "Macros").length} nutrients · equally weighted</span></div></article>
 <article class="card energy-card"><div class="card-kicker">ENERGY <span class="quiet">kcal</span></div><div class="energy-number">${fmt(v.calories)} <small>/ ${fmt(state.calorieTarget)}</small></div><div class="energy-track"><span style="width:${Math.min(100, (v.calories / state.calorieTarget) * 100)}%"></span></div><p class="energy-caption">${v.calories <= state.calorieTarget ? fmt(state.calorieTarget - v.calories) + " kcal to your target" : fmt(v.calories - state.calorieTarget) + " kcal above your target"}</p><div class="macro-list">${[
     "protein",
     "carbs",
@@ -487,7 +488,7 @@ async function renderDatabaseResults() {
     ? list
         .map(
           (f) =>
-            `<button class="food-result" data-database-food="${f.id}"><span class="element-icon">U</span><span><strong>${esc(f.name)}</strong><small>USDA SR Legacy · 100 g · ${nutrients.filter((n) => f.values[n.id] != null).length}/21 nutrients reported</small></span><span class="result-kcal">${fmt(f.calories)}<small>kcal</small></span>${icon("plus")}</button>`,
+            `<button class="food-result" data-database-food="${f.id}"><span class="element-icon">U</span><span><strong>${esc(f.name)}</strong><small>USDA SR Legacy · 100 g · ${nutrients.filter((n) => f.values[n.id] != null).length}/${nutrients.length} nutrients reported</small></span><span class="result-kcal">${fmt(f.calories)}<small>kcal</small></span>${icon("plus")}</button>`,
         )
         .join("")
     : '<div class="empty-state"><h3>No matching food in this database.</h3><p>Try another description, or use chat to clarify the meal and its sources.</p><button class="button secondary" data-action="open-chat">Describe this food</button></div>';
@@ -623,7 +624,7 @@ function chatStep() {
 }
 function chatReview() {
   const combined = combineFoods("Meal preview", chatItems, "preview");
-  return `<div class="chat-bubble assistant-bubble"><h3>Review your meal.</h3><div class="review-items">${chatItems.map((x) => `<div><strong>${esc(x.food.name)}</strong><span>${fmt(x.quantity)} × ${esc(x.food.serving)}</span><small>${esc(sourceLabel(x.food))}${safeUrl(x.food.sourceUrl) ? ` · <a href="${esc(safeUrl(x.food.sourceUrl))}" target="_blank" rel="noopener noreferrer">View source ↗</a>` : ""}</small></div>`).join("")}</div><div class="review-total"><strong>${fmt(combined.calories)} kcal</strong><span>${fmt(combined.values.protein || 0)} g protein · ${fmt(combined.values.carbs || 0)} g carbs</span></div><p class="review-data-count">${21 - combined.partialNutrients.length}/21 nutrients fully reported</p><form id="chat-confirm"><label class="field-label">Log to<select name="meal">${meals.map((m) => `<option ${meal === m ? "selected" : ""}>${m}</option>`).join("")}</select></label><details class="save-meal-details"><summary>Save this meal</summary><label class="field-label">Meal name<input name="name" maxlength="100" placeholder="e.g. My usual breakfast"></label></details><p class="quiet">For ${dateLabel()}</p><button class="button primary full">Confirm & log meal</button></form></div>`;
+  return `<div class="chat-bubble assistant-bubble"><h3>Review your meal.</h3><div class="review-items">${chatItems.map((x) => `<div><strong>${esc(x.food.name)}</strong><span>${fmt(x.quantity)} × ${esc(x.food.serving)}</span><small>${esc(sourceLabel(x.food))}${safeUrl(x.food.sourceUrl) ? ` · <a href="${esc(safeUrl(x.food.sourceUrl))}" target="_blank" rel="noopener noreferrer">View source ↗</a>` : ""}</small></div>`).join("")}</div><div class="review-total"><strong>${fmt(combined.calories)} kcal</strong><span>${fmt(combined.values.protein || 0)} g protein · ${fmt(combined.values.carbs || 0)} g carbs</span></div><p class="review-data-count">${nutrients.length - combined.partialNutrients.length}/${nutrients.length} nutrients fully reported</p><form id="chat-confirm"><label class="field-label">Log to<select name="meal">${meals.map((m) => `<option ${meal === m ? "selected" : ""}>${m}</option>`).join("")}</select></label><details class="save-meal-details"><summary>Save this meal</summary><label class="field-label">Meal name<input name="name" maxlength="100" placeholder="e.g. My usual breakfast"></label></details><p class="quiet">For ${dateLabel()}</p><button class="button primary full">Confirm & log meal</button></form></div>`;
 }
 function refreshChat() {
   const step = document.querySelector("#chat-step");
@@ -870,6 +871,7 @@ document.addEventListener("change", async (e) => {
     }
     try {
       const imported = JSON.parse(await file.text());
+      migrateReferenceTargets(imported);
       if (!validState(imported)) throw Error();
       showModal(
         `<p class="eyebrow">YOUR DATA</p><h2 id="modal-title">Restore this backup?</h2><p>This will replace your current food diary, targets, and custom foods with ${Object.keys(imported.days).length} days from this backup.</p><div class="modal-actions"><button class="button secondary" data-action="close">Cancel</button><button id="confirm-import" class="button primary">Replace & restore</button></div>`,

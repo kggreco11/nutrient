@@ -78,7 +78,7 @@ Editing a saved food creates a new version and archives the old one, preserving 
 
 Select 3, 6 or 12 months and an overall score, energy or individual nutrient. The chart shows monthly averages and the target line. Empty days and initial sample entries are excluded. Per-nutrient averages exclude days with no reported value for that nutrient. The nutrient grid shows monthly coverage, and an intake summary lists average daily amounts, targets and gaps, sorted by lowest target coverage. One recorded day is not described as a recurring pattern. These are deterministic calculations performed when you open Trends; no model calls, polling jobs, forecasts or ongoing analysis are involved.
 
-Overall score is the mean of 18 capped nutrient-coverage percentages (10 vitamins, 6 minerals, fiber and omega-3), rounded to an integer. Macros and energy are separate. A nutrient above target cannot mask a gap in another. Individual nutrient trends retain percentages above 100 so over-target patterns stay visible. Targets are current, editable examples, not personalized clinical recommendations. Coverage does not assess absorption, health, nutrient interactions or safe upper limits.
+Overall score is the mean of 31 capped nutrient-coverage percentages (13 vitamins, 15 minerals, fiber, choline and omega-3), rounded to an integer. Macros and energy are separate. A nutrient above target cannot mask a gap in another. Individual nutrient trends retain percentages above 100 so over-target patterns stay visible. Targets are current, editable examples, not personalized clinical recommendations. Coverage does not assess absorption, health, nutrient interactions or safe upper limits.
 
 ## iOS camera, dictation and data
 
@@ -101,3 +101,18 @@ Tracked micronutrient defaults now use U.S./Canadian male age 19–30 RDA/AI val
 On first load, legacy default values migrate once; values differing from the old defaults are preserved. A previously customized value identical to an old default cannot be distinguished from an untouched default. Imported legacy backups use the same migration. Historical entries are unchanged; charts compare them against current targets.
 
 Intake summaries describe recorded intake and report complete versus reported days, plus entirely unknown days. Days without any reported value for a nutrient are excluded from that nutrient's averages. Partial records can understate intake. The app does not diagnose deficiencies or recommend supplements.
+
+
+## Expanded dashboard and entry editing
+
+The native Today dashboard includes an overview of D, B6, B12, magnesium, choline and chromium; its category picker exposes vitamins, minerals and other nutrients. All 34 fields are available in search, label entry, settings and history. Missing composition values display as unreported rather than zero intake. The score remains a conservative coverage measure: unknown nutrients do not earn coverage.
+
+The expanded catalog adds niacin equivalents (B3), pantothenic acid (B5), biotin, choline, phosphorus, sodium, chloride, copper, iodine, manganese, molybdenum, chromium and fluoride. USDA values are imported only when reported; niacin equivalents may be calculated from measured niacin plus tryptophan (60 mg tryptophan per 1 mg NE), and fluoride is converted from µg to mg. Chromium/iodine/other sparsely reported fields remain null when absent. Existing saved records receive new fields without altering their old measured values or customized targets. Old USDA snapshots can gain newly imported nutrient fields by the same source record ID.
+
+Tap a logged row or its pencil in Today or Diary to edit its servings, meal and date. Saving updates the existing entry ID, recalculates totals, and moves the record when its date changes. It does not append a second copy. Label editing in Library versions the food independently of historical entries.
+
+Native accent colors adapt to light/dark appearance, including a contrasting foreground for filled buttons. `npm run test:native` checks actual Swift entry editing, date moves, persistence, migration and text/button contrast in a booted Apple Silicon simulator.
+
+The assistant explicitly disables reasoning for routine meal resolution and rejects blank provider output as a retryable service error. It never substitutes a generic food question for an empty model response. Live timing is documented in `docs/live-checks.md`; provider response time remains variable.
+
+Evidence-informed target discussion, including B6/B12 and Thorne comparisons, is in [`docs/sports-nutrition-targets.md`](docs/sports-nutrition-targets.md). Proposed ranges have not replaced saved user targets.

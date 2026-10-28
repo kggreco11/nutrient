@@ -8,6 +8,7 @@
     "build": "vite build && node scripts/build-hosted.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test tests/*.test.js",
+    "test:native": "sh scripts/test-native-models.sh",
     "ios:sync": "node scripts/sync-native-data.mjs",
     "ios:open": "open ios/App/App.xcodeproj",
     "format": "prettier --write app tests index.html capacitor.config.json"

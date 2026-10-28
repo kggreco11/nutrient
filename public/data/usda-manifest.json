@@ -8,5 +8,5 @@
   "restaurantCount": 312,
   "basis": "per 100 g",
   "license": "Public domain / CC0",
-  "micronutrients": "Vitamin A as RAE; folate as DFE; vitamin D in micrograms; omega-3 only when all ALA/EPA/DHA/DPA components are reported"
+  "micronutrients": "Vitamin A as RAE; folate as DFE; vitamin D in micrograms; niacin as NE (measured NE or niacin + tryptophan/60); fluoride converted \u00b5g to mg; unavailable fields remain null; omega-3 only when all ALA/EPA/DHA/DPA components are reported"
 }
