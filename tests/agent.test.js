@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runAgent, validateProposal } from "../server/agent.js";
 import { handleApi } from "../server/http.js";
-import { DEFAULT_MODEL } from "../server/policy.js";
+import { DEFAULT_MODEL, PINNED_PROVIDER } from "../server/policy.js";
 import { foods, nutrients } from "../app/data.js";
 const call = (name, args) => ({
   id: crypto.randomUUID(),
@@ -182,6 +182,7 @@ test("API checks authentication and cross-origin access before model execution",
   assert.deepEqual(await status.json(), {
     configured: true,
     model: DEFAULT_MODEL,
+    provider: PINNED_PROVIDER,
   });
 });
 test("empty provider output is a retryable service error, never a fabricated clarification", async () => {
