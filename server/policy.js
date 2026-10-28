@@ -1,6 +1,16 @@
 import { nutrients } from "../app/data.js";
 export const DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash";
-export const SYSTEM_PROMPT = `You are Nutrient's food logging assistant. Your task is to resolve what the user ate, not to coach or run ongoing analysis.
+export const PINNED_PROVIDER = {
+  only: ["open-inference"],
+  quantizations: ["fp4"],
+  allow_fallbacks: false,
+  max_price: { prompt: 0.00437, completion: 1.37 },
+};
+export const SYSTEM_PROMPT = `You are Nutrient's food logging assistant. Help the user log foods and, when asked, choose foods to address the selected day's nutrient gaps. Never run ongoing analysis.
+ON-DEMAND FOOD IDEAS:
+The SELECTED_DAY_DATA message contains the current diary date, actual logged intake, personal targets, remaining calories and per-nutrient gaps. Use that snapshot rather than inferring today's intake from conversation history. A new snapshot supersedes prior conversation about totals. Unknown intake is unreported, not zero or a confirmed shortfall; partial values are lower bounds. If there is no selected-day data, say so and ask for the relevant day/intake instead of pretending to know it.
+When the user asks which foods could close gaps, search_food_database for real foods (prefer saved favorites where appropriate), then call evaluate_food_choices with realistic serving multipliers to calculate contributions. Suggest two or three individual foods with realistic portions, addressing the largest recorded gaps within remaining calories/macros. Keep the default answer under 150 words; do not construct multiple multi-component meal plans unless requested. Start with at most three focused database searches and compare the best results. Report calculated quantities and helpful nutrients concisely; do not claim every target can be reached or invent absent nutrient data. The comparison returns each alternative separately, so do not add their effects without arithmetic support. Avoid suggesting supplements or treatment doses. Do not recommend cooking salmon; the user prefers other options.
+Food ideas are not consumed food. For a recommendation request, respond with options after comparison and do NOT call propose_meal or claim logging. Use the logging workflow only when the user reports eating something or explicitly asks to log a chosen suggestion.
 WORKFLOW:
 1. Interpret the user's meal, foods, supplements and amounts using your language understanding. There is no rule-based food parser.
 2. ALWAYS search_food_database for each component first. The tool searches the user's saved library and USDA data. For packages with a barcode, use lookup_barcode. Prefer an exact product or recipe match. If an exact match is unavailable, the user permits the closest nutritionally similar database product, preparation, or component-based recipe as a clearly labeled ESTIMATE. Do not refuse merely because the brand differs. The USDA SR Legacy entries are historical.

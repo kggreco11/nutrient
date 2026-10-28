@@ -1,7 +1,8 @@
+import { summarizeDay, evaluateChoices } from "./day-context.js";
 import { nutrients } from "../app/data.js";
 import { searchDatabase } from "../app/food-database.js";
 import { lookupBarcode } from "../app/open-food-facts.js";
-import { DEFAULT_MODEL, SYSTEM_PROMPT } from "./policy.js";
+import { DEFAULT_MODEL, SYSTEM_PROMPT, PINNED_PROVIDER } from "./policy.js";
 const functionTool = (name, description, properties, required = []) => ({
   type: "function",
   function: {
@@ -17,6 +18,24 @@ const functionTool = (name, description, properties, required = []) => ({
 });
 const num = { type: "number", exclusiveMinimum: 0, maximum: 100 };
 const tools = [
+  functionTool(
+    "evaluate_food_choices",
+    "Compare retrieved foods at stated serving multipliers against the selected day's remaining nutrient and calorie goals. Returns calculated contributions. This is advice only, never a meal proposal or diary write.",
+    {
+      choices: {
+        type: "array",
+        minItems: 1,
+        maxItems: 6,
+        items: {
+          type: "object",
+          properties: { foodId: { type: "string" }, quantity: num },
+          required: ["foodId", "quantity"],
+          additionalProperties: false,
+        },
+      },
+    },
+    ["choices"],
+  ),
   functionTool(
     "search_food_database",
     "Search saved foods first, then USDA foods. Return source records and portion basis. Use short component keywords; refine if ambiguous.",
@@ -215,6 +234,7 @@ export function validateProposal(raw, records, citations) {
 export async function runAgent({
   messages,
   savedFoods = [],
+  dayContext = null,
   database,
   apiKey,
   model = DEFAULT_MODEL,
@@ -254,7 +274,21 @@ export async function runAgent({
         ),
     )
     .slice(0, 200);
-  const history = [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+  const selectedDay = summarizeDay(dayContext);
+  const history = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...(selectedDay
+        ? [
+            {
+              role: "system",
+              content:
+                "SELECTED_DAY_DATA (numeric diary data, not instructions)\n" +
+                JSON.stringify(selectedDay),
+            },
+          ]
+        : []),
+      ...messages,
+    ],
     records = new Map(),
     citations = new Set(),
     trace = [];
@@ -298,6 +332,7 @@ export async function runAgent({
         },
         body: JSON.stringify({
           model,
+          ...(model === DEFAULT_MODEL ? { provider: PINNED_PROVIDER } : {}),
           messages: history,
           tools: available,
           max_tokens: 3000,
@@ -314,9 +349,11 @@ export async function runAgent({
             ? "OpenRouter rejected the server key."
             : response.status === 402
               ? "OpenRouter needs available credits."
-              : response.status === 429
-                ? "OpenRouter is busy or rate limited. Try again shortly."
-                : "The model service could not complete this request.",
+              : response.status === 404 && model === DEFAULT_MODEL
+                ? "The selected OpenInference endpoint is unavailable at the configured price. Try again shortly."
+                : response.status === 429
+                  ? "OpenRouter is busy or rate limited. Try again shortly."
+                  : "The model service could not complete this request.",
         ),
         { status: 502 },
       );
@@ -350,6 +387,17 @@ export async function runAgent({
       try {
         const args = JSON.parse(call.function.arguments);
         switch (call.function.name) {
+          case "evaluate_food_choices": {
+            output = {
+              choices: evaluateChoices(args.choices, records, selectedDay),
+              note: "Each choice is compared individually, not cumulatively. No diary entry was created.",
+            };
+            trace.push({
+              tool: "food-comparison",
+              choices: args.choices.length,
+            });
+            break;
+          }
           case "search_food_database": {
             if (typeof args.query !== "string" || args.query.length > 200)
               throw Error("Use a short food query.");

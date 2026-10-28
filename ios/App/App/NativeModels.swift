@@ -108,6 +108,33 @@ func number(_ value: Double) -> String {
   value.formatted(.number.precision(.fractionLength(0...(value < 10 ? 1 : 0))))
 }
 
+struct DailyNutrientProgress: Identifiable {
+  let nutrient: NutrientDefinition
+  let consumed: Double
+  let target: Double
+  let reported: Bool
+  let partial: Bool
+  var id: String { nutrient.id }
+  var remaining: Double { max(0, target - consumed) }
+  var fraction: Double { consumed / target }
+}
+struct NutrientContribution: Identifiable {
+  let entry: DiaryEntry
+  let food: NativeFood
+  let amount: Double?
+  let partial: Bool
+  var id: String { entry.id }
+}
+struct NativeDayContext: Encodable {
+  struct Entry: Encodable {
+    let quantity: Double
+    let food: NativeFood
+  }
+  let date: String
+  let calorieTarget: Double
+  let targets: [String: Double]
+  let entries: [Entry]
+}
 @MainActor final class NutrientStore: ObservableObject {
   @Published var state: NativeState
   @Published var date = Date()
@@ -410,6 +437,36 @@ func number(_ value: Double) -> String {
       (active.filter(match) + database.filter(match)).filter { seen.insert($0.id).inserted }.prefix(
         60))
   }
+  var dailyProgress: [DailyNutrientProgress] {
+    nutrients.filter { $0.group != "Macros" }.map { n in
+      DailyNutrientProgress(
+        nutrient: n, consumed: total(n.id), target: state.targets[n.id] ?? n.target,
+        reported: reported(n.id), partial: incomplete(n.id))
+    }
+  }
+  var dailyGaps: [DailyNutrientProgress] {
+    dailyProgress.filter { $0.reported && $0.remaining > 0 }.sorted {
+      $0.fraction == $1.fraction ? $0.nutrient.name < $1.nutrient.name : $0.fraction < $1.fraction
+    }
+  }
+  var unreportedNutrients: [DailyNutrientProgress] { dailyProgress.filter { !$0.reported } }
+  func contributions(_ nutrient: String) -> [NutrientContribution] {
+    day.entries.compactMap { entry in
+      guard let food = food(entry.foodId) else { return nil }
+      return NutrientContribution(
+        entry: entry, food: food, amount: food.value(nutrient).map { $0 * entry.quantity },
+        partial: food.partialNutrients?.contains(nutrient) == true)
+    }.sorted { ($0.amount ?? -1) > ($1.amount ?? -1) }
+  }
+  func dayContextPayload() throws -> Any {
+    let snapshot = NativeDayContext(
+      date: key(date), calorieTarget: state.calorieTarget, targets: state.targets,
+      entries: day.entries.compactMap { e in
+        guard let food = food(e.foodId) else { return nil }
+        return NativeDayContext.Entry(quantity: e.quantity, food: food)
+      })
+    return try JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot))
+  }
   func send(_ message: String, retry: Bool = false) async {
     guard !sending, !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
     sending = true
@@ -429,6 +486,7 @@ func number(_ value: Double) -> String {
       let result = try await backend.request([
         "messages": history.suffix(12).map { ["role": $0.role, "content": $0.content] },
         "savedFoods": saved,
+        "dayContext": try dayContextPayload(),
       ])
       let response = try JSONDecoder().decode(AgentResponse.self, from: result)
       state.chatHistory = Array(

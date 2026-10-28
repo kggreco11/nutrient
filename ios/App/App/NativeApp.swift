@@ -59,14 +59,7 @@ struct DashboardRing: View {
 struct NativeToday: View {
   @EnvironmentObject var store: NutrientStore
   @State private var add = false
-  @State private var group = "Overview"
   var tracked: [NutrientDefinition] { store.nutrients.filter { $0.group != "Macros" } }
-  var shown: [NutrientDefinition] {
-    group == "Overview"
-      ? ["vitD", "choline", "chromium", "b6", "b12", "magnesium"].compactMap { id in
-        tracked.first { $0.id == id }
-      } : tracked.filter { $0.group == group }
-  }
   var body: some View {
     NavigationStack {
       List {
@@ -85,27 +78,25 @@ struct NativeToday: View {
           ForEach(["protein", "carbs", "fat"], id: \.self) { id in
             let value = store.total(id)
             let target = store.state.targets[id] ?? 1
-            VStack(alignment: .leading, spacing: 10) {
-              HStack {
-                Text(id == "carbs" ? "Carbs" : id.capitalized).font(.subheadline.weight(.semibold))
-                Spacer()
-                Text("\(number(value)) / \(number(target)) g").font(.subheadline).foregroundStyle(
-                  .secondary)
-              }
-              ProgressView(value: min(value / target, 1)).tint(nutrientGreen).scaleEffect(
-                x: 1, y: 1.7, anchor: .center)
-            }.padding(.vertical, 7)
+            NavigationLink {
+              NativeNutrientDetail(id: id)
+            } label: {
+              VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                  Text(id == "carbs" ? "Carbs" : id.capitalized).font(
+                    .subheadline.weight(.semibold))
+                  Spacer()
+                  Text("\(number(value)) / \(number(target)) g").font(.subheadline).foregroundStyle(
+                    .secondary)
+                }
+                ProgressView(value: min(value / target, 1)).tint(nutrientGreen).scaleEffect(
+                  x: 1, y: 1.7, anchor: .center)
+              }.padding(.vertical, 7)
+            }.foregroundStyle(.primary).accessibilityHint("See contributing foods")
           }
         }
-        Section {
-          Picker("Show", selection: $group) {
-            ForEach(["Overview", "Vitamins", "Minerals", "Other"], id: \.self) { Text($0) }
-          }
-          ForEach(shown) { NativeNutrientRow(nutrient: $0) }
-          NavigationLink("All \(store.nutrients.count) nutrients") { NativeNutrients() }
-        } header: {
-          Text("Nutrients")
-        }
+        NativeDailyGaps()
+        Section { NavigationLink("All \(store.nutrients.count) nutrients") { NativeNutrients() } }
         Section("Today's food") {
           if store.day.entries.isEmpty { Button("Log food") { add = true } }
           ForEach(store.day.entries) { entry in
@@ -132,33 +123,177 @@ struct NativeToday: View {
     }
   }
 }
+struct NativeDailyGaps: View {
+  @EnvironmentObject var store: NutrientStore
+  @State private var expanded = false
+  var showAll = false
+  var body: some View {
+    Section {
+      if store.day.entries.isEmpty {
+        Text("Log food to see what's still needed.").foregroundStyle(.secondary)
+      } else if store.dailyGaps.isEmpty {
+        Text(
+          store.unreportedNutrients.isEmpty
+            ? "All nutrient targets met" : "All reported targets met"
+        ).foregroundStyle(nutrientGreen)
+      }
+      ForEach(Array(store.dailyGaps.prefix(expanded || showAll ? 31 : 5))) { gap in
+        NavigationLink {
+          NativeNutrientDetail(id: gap.id)
+        } label: {
+          VStack(alignment: .leading, spacing: 7) {
+            HStack {
+              Text(gap.nutrient.name)
+              Spacer()
+              Text("\(number(gap.remaining)) \(gap.nutrient.unit) left").font(
+                .subheadline.weight(.semibold)
+              ).foregroundStyle(nutrientGreen)
+            }
+            ProgressView(value: min(1, gap.fraction)).tint(nutrientGreen)
+            if gap.partial {
+              Text("Partial intake data").font(.footnote).foregroundStyle(.secondary)
+            }
+          }.padding(.vertical, 4)
+        }.foregroundStyle(.primary)
+      }
+      if !showAll && store.dailyGaps.count > 5 {
+        Button(expanded ? "Show fewer" : "Show all \(store.dailyGaps.count) shortfalls") {
+          expanded.toggle()
+        }
+      }
+      if !store.day.entries.isEmpty && !store.unreportedNutrients.isEmpty {
+        DisclosureGroup("Not reported · \(store.unreportedNutrients.count) nutrients") {
+          ForEach(store.unreportedNutrients) { item in
+            NavigationLink(item.nutrient.name) { NativeNutrientDetail(id: item.id) }
+          }
+        }
+      }
+      Button {
+        store.tab = 2
+        Task {
+          await store.send(
+            "Which foods would help me hit the remaining nutrient goals for \(store.key(store.date))? Use my logged intake and remaining calories; suggest food options without logging them."
+          )
+        }
+      } label: {
+        Label("Find foods for these gaps", systemImage: "sparkles")
+      }.disabled(store.sending)
+    } header: {
+      Text(
+        store.dailyGaps.isEmpty
+          ? "Daily nutrient gaps" : "Still to go · \(store.dailyGaps.count) targets")
+    }
+  }
+}
+struct NativeDailyCoverage: View {
+  @EnvironmentObject var store: NutrientStore
+  var body: some View {
+    List {
+      Text(store.date, format: .dateTime.month(.wide).day().year()).foregroundStyle(.secondary)
+      NativeDailyGaps(showAll: true)
+      Section("Targets met") {
+        ForEach(store.dailyProgress.filter { $0.reported && $0.remaining == 0 }) { item in
+          NativeNutrientRow(nutrient: item.nutrient)
+        }
+      }
+    }.scrollIndicators(.hidden).navigationTitle("Daily coverage").navigationBarTitleDisplayMode(
+      .inline)
+  }
+}
+struct NativeNutrientDetail: View {
+  @EnvironmentObject var store: NutrientStore
+  let id: String
+  var nutrient: NutrientDefinition { store.nutrients.first { $0.id == id }! }
+  var contributions: [NutrientContribution] { store.contributions(id) }
+  var body: some View {
+    List {
+      Section {
+        Text(store.date, format: .dateTime.month(.wide).day().year()).font(.subheadline)
+          .foregroundStyle(.secondary)
+        HStack(alignment: .firstTextBaseline) {
+          Text(
+            store.reported(id)
+              ? "\(store.incomplete(id) ? "≥ " : "")\(number(store.total(id))) \(nutrient.unit)"
+              : "Not reported"
+          ).font(.title2.bold())
+          Spacer()
+          Text("of \(number(store.state.targets[id] ?? nutrient.target)) \(nutrient.unit)")
+            .foregroundStyle(.secondary)
+        }
+        ProgressView(value: min(1, store.total(id) / (store.state.targets[id] ?? nutrient.target)))
+          .tint(nutrientGreen)
+      }
+      Section("Food contributions") {
+        if contributions.allSatisfy { ($0.amount ?? 0) == 0 } {
+          Text(
+            contributions.isEmpty
+              ? "No food logged on this day." : "No positive contribution reported."
+          ).foregroundStyle(.secondary)
+        }
+        ForEach(contributions.filter { ($0.amount ?? 0) > 0 }) { item in
+          VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .top) {
+              Text(item.food.name)
+              Spacer()
+              Text("\(item.partial ? "≥ " : "")\(number(item.amount ?? 0)) \(nutrient.unit)").font(
+                .headline
+              ).foregroundStyle(nutrientGreen).fixedSize(horizontal: true, vertical: false)
+            }
+            Text("\(number(item.entry.quantity)) × \(item.food.serving) · \(item.entry.meal)").font(
+              .subheadline
+            ).foregroundStyle(.secondary)
+          }.padding(.vertical, 5)
+        }
+      }
+      if contributions.contains(where: { $0.amount == nil }) {
+        Section {
+          DisclosureGroup("Not reported by these foods") {
+            ForEach(contributions.filter { $0.amount == nil }) { item in Text(item.food.name) }
+          }
+        }
+      }
+      if contributions.contains(where: { $0.amount == 0 }) {
+        Section {
+          DisclosureGroup("Reported zero") {
+            ForEach(contributions.filter { $0.amount == 0 }) { item in Text(item.food.name) }
+          }
+        }
+      }
+    }.scrollIndicators(.hidden).navigationTitle(nutrient.name).navigationBarTitleDisplayMode(
+      .inline)
+  }
+}
 struct NativeNutrientRow: View {
   @EnvironmentObject var store: NutrientStore
   let nutrient: NutrientDefinition
   var body: some View {
     let value = store.total(nutrient.id)
     let target = store.state.targets[nutrient.id] ?? nutrient.target
-    VStack(alignment: .leading, spacing: 7) {
-      HStack(alignment: .firstTextBaseline) {
-        Text(nutrient.name)
-        Spacer()
-        Text(
-          store.reported(nutrient.id)
-            ? "\(number(value)) / \(number(target)) \(nutrient.unit)"
-            : "— / \(number(target)) \(nutrient.unit)"
-        ).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
-      }
-      if store.reported(nutrient.id) {
-        ProgressView(value: min(value / target, 1)).tint(nutrientGreen)
-        if store.incomplete(nutrient.id) {
-          Text("Partial data").font(.caption).foregroundStyle(.secondary)
+    NavigationLink {
+      NativeNutrientDetail(id: nutrient.id)
+    } label: {
+      VStack(alignment: .leading, spacing: 7) {
+        HStack(alignment: .firstTextBaseline) {
+          Text(nutrient.name)
+          Spacer()
+          Text(
+            store.reported(nutrient.id)
+              ? "\(number(value)) / \(number(target)) \(nutrient.unit)"
+              : "— / \(number(target)) \(nutrient.unit)"
+          ).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
         }
-      } else {
-        Text(store.day.entries.isEmpty ? "No food logged" : "Not reported in logged foods").font(
-          .caption
-        ).foregroundStyle(.secondary)
-      }
-    }.padding(.vertical, 4)
+        if store.reported(nutrient.id) {
+          ProgressView(value: min(value / target, 1)).tint(nutrientGreen)
+          if store.incomplete(nutrient.id) {
+            Text("Partial data").font(.caption).foregroundStyle(.secondary)
+          }
+        } else {
+          Text(store.day.entries.isEmpty ? "No food logged" : "Not reported in logged foods").font(
+            .caption
+          ).foregroundStyle(.secondary)
+        }
+      }.padding(.vertical, 4)
+    }.foregroundStyle(.primary).accessibilityHint("See contributing foods")
   }
 }
 struct NativeLoggedEntry: View {
@@ -261,6 +396,12 @@ struct NativeDiary: View {
     NavigationStack {
       List {
         DatePicker("Date", selection: $store.date, displayedComponents: .date)
+        NavigationLink {
+          NativeDailyCoverage()
+        } label: {
+          LabeledContent("Nutrient coverage", value: "\(store.dailyGaps.count) still short")
+        }
+
         ForEach(nativeMeals, id: \.self) { meal in
           Section(meal) {
             let entries = store.day.entries.filter { $0.meal == meal }

@@ -119,3 +119,12 @@ Evidence-informed target discussion, including B6/B12 and Thorne comparisons, is
 
 
 Closest-match meal logging is permitted by default. The assistant prefers the exact product, then may choose a nutritionally comparable retrieved food or component-based recipe. It supplies `estimatedFor` and `matchReason`; the harness creates a distinct `(estimate)` record with source provenance and unchanged source nutrient values. It does not relabel an approximation as verified branded nutrition. Missing nutrients remain unknown, and logging still requires review/confirmation. Exact current-source lookup remains available when requested. This relaxation does not permit invented supplement dosages.
+
+
+## Daily gaps and food ideas
+
+Today surfaces the lowest recorded nutrient coverage with the amount still needed. All known shortfalls can expand inline; unreported nutrients are separate. Diary provides the same coverage for the selected date. Tap any macro bar, nutrient row or gap to see per-food contributions, scaled by logged portions and including supplements. Unknown and explicitly zero contributions remain distinct.
+
+Chat sends a fresh snapshot of the selected day's logged food values and personal targets with each user request. The server validates numeric data and computes remaining amounts. On-demand food suggestions use database searches plus `evaluate_food_choices` to calculate each option against the actual gaps and remaining calories. Suggestions do not create meal proposals or diary entries. There are no automatic coaching runs.
+
+The user selected `deepseek/deepseek-v4.1-flash` through OpenInference's FP4 endpoint: request routing allows only `open-inference`, disables fallbacks, and caps per-million rates at $0.00437 input and $1.37 output. This is a provider-specific quote, distinct from the model catalog's single top-provider pricing object. If that endpoint/price is unavailable, the request fails rather than silently changing provider.

@@ -50,6 +50,36 @@ import UIKit
     precondition(reloaded.state.targets["chromium"] == 35 && reloaded.state.targets["vitD"] == 50)
     precondition(reloaded.state.days[store.key(end)]!.entries.count == 1)
     precondition(!store.reported("chromium"))
+    let daily = NutrientStore(
+      seedURL: seedURL, storageURL: directory.appendingPathComponent("daily.json"),
+      mirrorPreferences: false)
+    let meat = NativeFood(
+      id: "contribution-meat", name: "Meat", serving: "100 g", calories: 100,
+      values: ["protein": 20])
+    let milk = NativeFood(
+      id: "contribution-milk", name: "Milk", serving: "1 glass", calories: 100,
+      values: ["protein": 8, "vitC": 0])
+    let unknown = NativeFood(
+      id: "unknown", name: "Unreported food", serving: "1 serving", calories: 0, values: [:])
+    daily.log(
+      [
+        MealItem(food: meat, quantity: 2), MealItem(food: milk, quantity: 1.5),
+        MealItem(food: unknown, quantity: 1),
+      ], meal: "Breakfast")
+    let contributions = daily.contributions("protein")
+    precondition(
+      contributions.count == 3 && contributions[0].amount == 40 && contributions[1].amount == 12
+        && contributions[2].amount == nil)
+    precondition(daily.total("protein") == 52)
+    precondition(daily.dailyGaps.contains { $0.id == "vitC" && $0.remaining == 90 && $0.partial })
+    precondition(!daily.dailyGaps.contains { $0.id == "chromium" })
+    precondition(daily.unreportedNutrients.contains { $0.id == "chromium" })
+    daily.date = end
+    let snapshot = try daily.dayContextPayload() as! [String: Any]
+    precondition(snapshot["date"] as? String == daily.key(end))
+    precondition((snapshot["entries"] as? [Any])?.isEmpty == true)
+    print(
+      "Daily gap, unknown-data, food contribution scaling and selected-day snapshot checks passed")
     func luminance(_ color: UIColor, _ traits: UITraitCollection) -> Double {
       var r: CGFloat = 0
       var g: CGFloat = 0

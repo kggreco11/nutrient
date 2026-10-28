@@ -1,5 +1,5 @@
 import { runAgent } from "./agent.js";
-import { DEFAULT_MODEL } from "./policy.js";
+import { DEFAULT_MODEL, PINNED_PROVIDER } from "./policy.js";
 const json = (data, status = 200, headers = {}) =>
   Response.json(data, {
     status,
@@ -34,6 +34,10 @@ export async function handleApi(
       {
         configured: !!env.OPENROUTER_API_KEY,
         model: env.OPENROUTER_MODEL || DEFAULT_MODEL,
+        provider:
+          (env.OPENROUTER_MODEL || DEFAULT_MODEL) === DEFAULT_MODEL
+            ? PINNED_PROVIDER
+            : null,
       },
       200,
       cors,
@@ -69,6 +73,7 @@ export async function handleApi(
     const result = await runAgent({
       messages: input.messages,
       savedFoods: input.savedFoods,
+      dayContext: input.dayContext,
       database: await loadDatabase(),
       apiKey: env.OPENROUTER_API_KEY,
       model: env.OPENROUTER_MODEL || DEFAULT_MODEL,

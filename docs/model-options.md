@@ -1,10 +1,31 @@
+> **Current app setting:** Following the user's explicit selection, the app now pins `deepseek/deepseek-v4.1-flash` to OpenInference FP4, with no provider fallback and maximum quoted rates of $0.00437 input / $1.37 output per million tokens. Live requests returned `provider: OpenInference`. The older alternative-model experiments below are historical, not the current configuration.
+
 # Cheaper OpenRouter models for Nutrient
 
 Checked **27 October 2026, America/Los_Angeles**. Existing app model remains `deepseek/deepseek-v4.1-flash`; no model configuration changed. A follow-up test used a revised validator and prompt as detailed below.
 
-## Shortlist and prices
+## Correction: the website and catalog show different provider prices
 
-These three are cheaper on **both uncached input and output catalog rates** than the current model. They support function tools and accept the app's non-reasoning request shape. That makes them integration candidates, not proven equivalents in overall capability. The current model is already inexpensive.
+The earlier comparison treated the catalog's single `pricing` object too much like a definitive model price. **The user's screenshot is correct.** The public model-page headline and `/api/v1/models` currently show different provider quotes for the same model. OpenRouter explicitly defines catalog `pricing` as **pricing from the top provider**, rather than a universal or cheapest rate. [Official Models API documentation](https://openrouter.ai/docs/guides/overview/models).
+
+| Same model, different official surface | Input / 1M | Output / 1M | Matching provider endpoint |
+|---|---:|---:|---|
+| V4.1 Flash: public page headline | **$0.00437** | **$1.37** | OpenInference, `open-inference/fp4` |
+| V4.1 Flash: catalog API `pricing` | $0.14 | $0.42 | DeepInfra, `deepinfra/fp8` |
+| V4.1 Flash 1017: public page headline | **$0.0151** | **$1.80** | OpenInference, `open-inference/fp4` |
+| V4.1 Flash 1017: catalog API `pricing` at recheck | $0.15 | $0.60 | DeepSeek, `deepseek`; includes a time-of-day schedule |
+
+Sources: [Flash public page](https://openrouter.ai/deepseek/deepseek-v4.1-flash), [1017 public page](https://openrouter.ai/deepseek/deepseek-v4.1-flash-1017), [catalog API](https://openrouter.ai/api/v1/models), [Flash endpoint API](https://openrouter.ai/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints), [1017 endpoint API](https://openrouter.ai/api/v1/models/deepseek/deepseek-v4.1-flash-1017/endpoints). All rates are USD per million tokens; raw API token rates were multiplied by one million.
+
+The correspondence is exact: OpenInference's `prompt` and `completion` fields equal the headline pairs above. **These headline input rates are not the endpoint's cache-read rates.** The same endpoint separately quotes cached input at $0.00143/M for Flash and $0.015/M for 1017. This rules out simply explaining the screenshot as “cached input versus uncached input.” The precise algorithm that selects the website headline endpoint was not established in the official documentation reviewed; do not invent a cache blend or effective-usage explanation.
+
+For the user's current price question, compare the same provider and pricing basis: on those OpenInference headline quotes, **1017 is higher on both input and output** than the earlier Flash. The 1017 page describes an October 17 snapshot, whereas the earlier model page describes the September 10 release. That identifies versions; it does not establish comparative food-logging accuracy. No 1017 paid test or model switch was performed.
+
+The app currently leaves provider routing automatic, so a headline or a catalog row is not a guaranteed charged rate. The earlier smoke tests actually reached Wafer and Decart for Flash, with the returned `usage.cost` shown below. OpenRouter documents provider-specific routing and price caps. [Official routing documentation](https://openrouter.ai/docs/guides/routing/provider-selection).
+
+## Historical shortlist from the first catalog check
+
+The following three were cheaper on both input and output **than the $0.14/$0.42 catalog comparison quote**, not cheaper than every Flash endpoint. In particular, none has a lower input rate than the $0.00437 public headline quote. These are archived research candidates, not a fresh recommendation to replace Flash. They support function tools and accept the app's non-reasoning request shape; the actual workflow limitations are recorded below.
 
 | Candidate | Exact model ID | Input / 1M tokens | Output / 1M tokens | Context | Assessment for this app |
 |---|---|---:|---:|---:|---|
@@ -15,7 +36,7 @@ These three are cheaper on **both uncached input and output catalog rates** than
 
 Rates, modalities, context, tool support, and reasoning metadata were read directly from the [official live model catalog](https://openrouter.ai/api/v1/models). Qwen's rates rise at **32,000 prompt tokens to $0.10/$0.40**, then at **256,000 to $0.20/$0.80**; the last tier is more expensive than the quoted baseline. [Qwen model page](https://openrouter.ai/qwen/qwen3.7-flash). Solar's page currently marks its $0.05/$0.20 rates **50% off**, so do not assume they are permanent. [Solar model page](https://openrouter.ai/upstage/solar-mini4).
 
-Illustrative uncached workload of 10,000 input + 1,000 output tokens: baseline **$0.00182**, older DeepSeek **$0.001428**, Qwen **$0.00043**, Solar **$0.00070**, using the catalog rates above. This calculation holds token counts constant and excludes caching, routing differences, retries, and web-tool fees.
+Illustrative uncached workload of 10,000 input + 1,000 output tokens: baseline **$0.00182**, older DeepSeek **$0.001428**, Qwen **$0.00043**, Solar **$0.00070**, using the catalog quotes above. These examples compare those particular quotes only. They do not use the public headline pairs. This calculation holds token counts constant and excludes caching, routing differences, retries, and web-tool fees.
 
 ## What the actual app harness did
 

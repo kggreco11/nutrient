@@ -666,6 +666,17 @@ async function beginChat(message, retry = false) {
     const result = await sendChat(
       {
         messages: chatHistory.slice(-12),
+        dayContext: {
+          date: selectedDate,
+          calorieTarget: state.calorieTarget,
+          targets: state.targets,
+          entries: day()
+            .entries.map((e) => ({
+              quantity: e.quantity,
+              food: catalog().find((f) => f.id === e.foodId),
+            }))
+            .filter((e) => e.food),
+        },
         savedFoods: state.customFoods.filter((f) => !f.archived),
       },
       {

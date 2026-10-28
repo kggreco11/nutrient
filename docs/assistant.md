@@ -29,3 +29,10 @@ Secrets remain server-only. Untrusted retrieved pages and food descriptions cann
 Model tokens and web tools consume credits. No requests run while the app is idle, and Trends never calls the model. No ongoing EDA, coaching, predictions, background monitoring or schedules are part of this version.
 
 Automated tests use mocked OpenRouter responses to verify tool order, lookup-before-web gating, proposal provenance, error handling and no-key behavior. Live checks on 2026-10-27 additionally verified a USDA proposal, clarification of an ambiguous burrito, and database-to-web fallback with a cited official nutrition PDF. The app review/confirmation flow was exercised in the browser. These bounded cases do not establish reliability for every food. See `docs/live-checks.md`. Physical iPhone camera and dictation verification remain outstanding.
+
+
+## Selected-day questions
+
+The optional `dayContext` request includes the date, current targets and logged source nutrition with serving multipliers. `server/day-context.js` validates it and recomputes intake, remaining amounts and reported/partial states. Only numeric/known catalog labels enter the model's `SELECTED_DAY_DATA` system message; food metadata in the client snapshot is not treated as instructions. Missing daily context must not be inferred from conversation history.
+
+For food suggestions, the model searches source foods, then calls `evaluate_food_choices`. All compared IDs must have appeared in this request's database results, servings must be positive and bounded, and supplements cannot be proposed as food advice. Each option is evaluated separately by deterministic arithmetic. Advice answers do not call `propose_meal`; logging still requires an explicit user choice and confirmation.
