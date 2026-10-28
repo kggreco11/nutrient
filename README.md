@@ -115,4 +115,4 @@ Native accent colors adapt to light/dark appearance, including a contrasting for
 
 The assistant explicitly disables reasoning for routine meal resolution and rejects blank provider output as a retryable service error. It never substitutes a generic food question for an empty model response. Live timing is documented in `docs/live-checks.md`; provider response time remains variable.
 
-Evidence-informed target discussion, including B6/B12 and Thorne comparisons, is in [`docs/sports-nutrition-targets.md`](docs/sports-nutrition-targets.md). Proposed ranges have not replaced saved user targets.
+Evidence-informed target discussion, including B6/B12 and Thorne comparisons, is in [`docs/sports-nutrition-targets.md`](docs/sports-nutrition-targets.md). The user subsequently requested an update: the provisional plan is now 3,500 kcal, 160 g protein, 500 g carbohydrate, 95 g fat, B6 1.8 mg, B12 4 µg and D 25 µg (matching the reported 1,000 IU). Existing customized goals are preserved. Saved D3/K2 and Nordic fish-oil records can be logged individually; there is no automatic daily logging. Other micronutrient targets remain starting references pending discussion.

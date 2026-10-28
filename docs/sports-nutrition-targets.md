@@ -69,3 +69,11 @@ All numbers are **daily total intake** unless otherwise stated. U.S. RDA/AI figu
 ## Remaining uncertainty
 
 This review does not establish a complete optimal-longevity micronutrient formula. Direct lifespan or healthspan trials in healthy young athletes are sparse. It also does not establish individual requirements for sodium replacement, separate ALA/EPA/DHA targets, creatine, or training-day hydration; those require separate evidence review and should not be folded into a generic “more nutrients = better” score.
+
+## Provisional plan applied after the user's follow-up
+
+The user subsequently asked to update the app now while continuing the discussion. The first personal plan is 3,500 kcal, 160 g protein, 500 g carbohydrate and 95 g fat (3,495 kcal by 4/4/9). This is a 300–500 kcal nominal surplus over the reported stable 3,000–3,200 kcal intake, and approximately 2.1 g/kg protein, 6.6 g/kg carbohydrate and 1.25 g/kg fat at 168 lb. B6 is 1.8 mg; B12 is 4 µg, at the lower end of the discussion band above. Remaining micronutrient references remain provisional; this is not a claimed optimized longevity formula.
+
+The user reports taking 1,000 IU D3 with 45 µg K2 daily. The app's provisional vitamin D tracking target is 25 µg, matching that reported dose, not a treatment dose newly prescribed here. The total vitamin K target remains 120 µg; no separate universal K2 target has been established. The saved D3/K2 record leaves other nutrient fields and energy unreported rather than inventing a label.
+
+The user also reports one capsule of Nordic Naturals' 1,280 mg-per-two-capsule formula. For the plain Ultimate Omega label, one soft gel supplies 640 mg total omega-3, including 325 mg EPA and 225 mg DHA, 10 kcal and 1 g fat. A saved supplement uses that single-soft-gel basis. Source: [Nordic Naturals consumer page](https://www.nordic.com/products/ultimate-omega/), [manufacturer's practitioner label](https://www.nordicpro.com/products/nordic-naturals/ultimate-omega/). These supplements are available to log, not automatically written into each diary day. Separate ALA and EPA+DHA targets remain a discussion item; the existing combined omega-3 field is not a substitute for those distinct reference concepts.

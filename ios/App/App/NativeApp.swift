@@ -159,7 +159,10 @@ struct NativeLoggedEntry: View {
           }
           Spacer()
           VStack(alignment: .trailing, spacing: 8) {
-            Text("\(number(food.calories*entry.quantity)) kcal").font(.subheadline).foregroundStyle(
+            Text(
+              food.energyUnreported == true
+                ? "Energy unreported" : "\(number(food.calories*entry.quantity)) kcal"
+            ).font(.subheadline).foregroundStyle(
               .secondary)
             Image(systemName: "pencil").foregroundStyle(nutrientGreen)
           }
@@ -202,7 +205,10 @@ struct NativeEntryEditor: View {
               TextField("Servings", value: $quantity, format: .number).keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
             }
-            LabeledContent("Energy", value: "\(number(food.calories*quantity)) kcal")
+            LabeledContent(
+              "Energy",
+              value: food.energyUnreported == true
+                ? "Unreported" : "\(number(food.calories*quantity)) kcal")
           }
           Section {
             Picker("Meal", selection: $meal) {
@@ -445,7 +451,10 @@ struct NativeMealReview: View {
           }
         }
         Section {
-          LabeledContent("Energy", value: "\(number(calories)) kcal")
+          LabeledContent(
+            "Energy",
+            value: items.contains { $0.food.energyUnreported == true }
+              ? "≥ \(number(calories)) kcal (partial)" : "\(number(calories)) kcal")
           Picker("Log to", selection: $meal) { ForEach(nativeMeals, id: \.self) { Text($0) } }
           DatePicker("Date", selection: $store.date, displayedComponents: .date)
         }
@@ -517,7 +526,11 @@ struct FoodRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 5) {
       Text(food.name)
-      Text("\(food.serving) · \(number(food.calories)) kcal").font(.subheadline).foregroundStyle(
+      Text(
+        food.energyUnreported == true
+          ? "\(food.serving) · energy unreported"
+          : "\(food.serving) · \(number(food.calories)) kcal"
+      ).font(.subheadline).foregroundStyle(
         .secondary)
       if let source = food.source { Text(source).font(.caption).foregroundStyle(.secondary) }
     }.padding(.vertical, 4)

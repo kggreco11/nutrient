@@ -35,10 +35,18 @@ import UIKit
     let a = try JSONSerialization.jsonObject(with: before) as! NSDictionary
     let b = try JSONSerialization.jsonObject(with: after) as! NSDictionary
     precondition(a == b)
+    store.state.personalTargetVersion = nil
+    store.state.calorieTarget = 2200
+    store.state.targets["protein"] = 100
+    store.state.targets["b6"] = 1.3
+    store.state.targets["b12"] = 2.4
     store.state.targets["vitD"] = 50
     store.state.targets.removeValue(forKey: "chromium")
     store.save()
     let reloaded = NutrientStore(seedURL: seedURL, storageURL: storage, mirrorPreferences: false)
+    precondition(
+      reloaded.state.calorieTarget == 3500 && reloaded.state.targets["protein"] == 160
+        && reloaded.state.targets["b6"] == 1.8 && reloaded.state.targets["b12"] == 4)
     precondition(reloaded.state.targets["chromium"] == 35 && reloaded.state.targets["vitD"] == 50)
     precondition(reloaded.state.days[store.key(end)]!.entries.count == 1)
     precondition(!store.reported("chromium"))

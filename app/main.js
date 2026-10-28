@@ -2,6 +2,10 @@ import "./style.css";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { sendChat } from "./chat-client.js";
+import {
+  migratePersonalTargets,
+  personalSupplements,
+} from "./personal-plan.js";
 import { migrateReferenceTargets } from "./targets.js";
 import { nutrients, foods, meals, initialState, localDate } from "./data.js";
 import { totals, coverage, score, status, validState } from "./model.js";
@@ -67,19 +71,24 @@ const safeUrl = (s) => {
 const fmt = (n) =>
   Number(n.toFixed(n < 1 ? 2 : n < 10 ? 1 : 0)).toLocaleString();
 let state,
-  storageError = false;
+  storageError = false,
+  migrationChanged = false;
 try {
   const raw = isNative()
     ? (await Preferences.get({ key: "nutrient-v1" })).value
     : localStorage.getItem("nutrient-v1");
   state = raw ? JSON.parse(raw) : initialState();
-  migrateReferenceTargets(state);
+  migrationChanged = migrateReferenceTargets(state);
+  migrationChanged =
+    migratePersonalTargets(state, personalSupplements(nutrients)) ||
+    migrationChanged;
   if (!validState(state)) throw Error("invalid");
 } catch {
   state = initialState();
   storageError = true;
 }
-const referenceTargetsMigrated = migrateReferenceTargets(state);
+const referenceTargetsMigrated =
+  migrationChanged || migrateReferenceTargets(state);
 let scannerSession = null,
   scanGeneration = 0,
   database = [],
@@ -872,6 +881,7 @@ document.addEventListener("change", async (e) => {
     try {
       const imported = JSON.parse(await file.text());
       migrateReferenceTargets(imported);
+      migratePersonalTargets(imported, personalSupplements(nutrients));
       if (!validState(imported)) throw Error();
       showModal(
         `<p class="eyebrow">YOUR DATA</p><h2 id="modal-title">Restore this backup?</h2><p>This will replace your current food diary, targets, and custom foods with ${Object.keys(imported.days).length} days from this backup.</p><div class="modal-actions"><button class="button secondary" data-action="close">Cancel</button><button id="confirm-import" class="button primary">Replace & restore</button></div>`,

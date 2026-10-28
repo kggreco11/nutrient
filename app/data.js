@@ -1,3 +1,8 @@
+import {
+  personalTargets,
+  personalCalorieTarget,
+  personalSupplements,
+} from "./personal-plan.js";
 import { referenceTargets } from "./targets.js";
 // Illustrative food composition per listed serving. Not a verified food database.
 // Null means unknown; 0 means the sample explicitly records no contribution.
@@ -654,10 +659,12 @@ for (const food of foods)
 export const meals = ["Breakfast", "Lunch", "Dinner", "Snacks", "Supplements"];
 for (const n of nutrients) {
   if (referenceTargets[n.id] !== undefined) n.target = referenceTargets[n.id];
+  if (personalTargets[n.id] !== undefined) n.target = personalTargets[n.id];
 }
 export const defaultTargets = {
   ...Object.fromEntries(nutrients.map((n) => [n.id, n.target])),
   ...referenceTargets,
+  ...personalTargets,
 };
 export function localDate(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -667,9 +674,10 @@ export function initialState() {
   return {
     version: 1,
     targets: { ...defaultTargets },
-    calorieTarget: 2200,
+    calorieTarget: personalCalorieTarget,
+    personalTargetVersion: 1,
     waterTarget: 8,
-    customFoods: [],
+    customFoods: personalSupplements(nutrients),
     days: {
       [day]: {
         demo: true,

@@ -31,6 +31,7 @@ struct NativeFood: Codable, Identifiable {
   var components: [FoodComponent]?
   var evidence: String?
   var retrievedAt: String?
+  var energyUnreported: Bool?
   func value(_ id: String) -> Double? { values[id] ?? nil }
   var isSupplement: Bool { kind == "supplement" }
 }
@@ -63,10 +64,13 @@ struct NativeState: Codable {
   var customFoods: [NativeFood]
   var days: [String: DiaryDay]
   var referenceTargetVersion: Int?
+  var personalTargetVersion: Int?
   var chatHistory: [NativeMessage]?
   var pendingMeal: [MealItem]?
 }
 struct NativeSeed: Decodable {
+  let calorieTarget: Double?
+  let supplements: [NativeFood]?
   let nutrients: [NutrientDefinition]
   let foods: [NativeFood]
   let targets: [String: Double]
@@ -117,6 +121,7 @@ func number(_ value: Double) -> String {
   let nutrients: [NutrientDefinition]
   let sampleFoods: [NativeFood]
   let backend = NativeBackend()
+  private let plannedSupplements: [NativeFood]
   private let dataURL: URL
   private let mirrorPreferences: Bool
   init(seedURL: URL? = nil, storageURL: URL? = nil, mirrorPreferences: Bool = true) {
@@ -125,6 +130,7 @@ func number(_ value: Double) -> String {
     let seed = try! JSONDecoder().decode(NativeSeed.self, from: Data(contentsOf: seedURL))
     nutrients = seed.nutrients
     sampleFoods = seed.foods
+    plannedSupplements = seed.supplements ?? []
     let directory = FileManager.default.urls(
       for: .applicationSupportDirectory, in: .userDomainMask)[0]
     try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -135,14 +141,16 @@ func number(_ value: Double) -> String {
         ? UserDefaults.standard.string(forKey: "CapacitorStorage.nutrient-v1")?.data(using: .utf8)
         : nil)
     if let existing, let decoded = try? JSONDecoder().decode(NativeState.self, from: existing),
-      let restored = Self.expanded(decoded, nutrients: seed.nutrients),
+      let restored = Self.expanded(
+        decoded, nutrients: seed.nutrients, supplements: seed.supplements ?? []),
       Self.valid(restored, nutrients: seed.nutrients, foods: seed.foods)
     {
       state = restored
     } else {
       state = NativeState(
-        version: 1, targets: seed.targets, calorieTarget: 2200, waterTarget: 8, customFoods: [],
-        days: [:], referenceTargetVersion: 1)
+        version: 1, targets: seed.targets, calorieTarget: seed.calorieTarget ?? 3500,
+        waterTarget: 8, customFoods: seed.supplements ?? [],
+        days: [:], referenceTargetVersion: 1, personalTargetVersion: 1)
       if let existing {
         let recovery = directory.appendingPathComponent(
           "nutrient-recovery-" + UUID().uuidString + ".json")
@@ -168,14 +176,30 @@ func number(_ value: Double) -> String {
       state.pendingMeal = nil
     }
     backend.bootstrap()
+    save()
   }
-  static func expanded(_ original: NativeState, nutrients: [NutrientDefinition]) -> NativeState? {
+  static func expanded(
+    _ original: NativeState, nutrients: [NutrientDefinition], supplements: [NativeFood] = []
+  ) -> NativeState? {
     var state = original
     for n in nutrients where state.targets[n.id] == nil { state.targets[n.id] = n.target }
     for i in state.customFoods.indices {
       for n in nutrients where !state.customFoods[i].values.keys.contains(n.id) {
         state.customFoods[i].values[n.id] = .some(nil)
       }
+    }
+    if state.personalTargetVersion != 1 {
+      if state.calorieTarget == 2200 { state.calorieTarget = 3500 }
+      let previous: [String: Double] = [
+        "protein": 100, "carbs": 275, "fat": 78, "b6": 1.3, "b12": 2.4, "vitD": 15,
+      ]
+      for (id, value) in previous where state.targets[id] == value {
+        state.targets[id] = nutrients.first { $0.id == id }?.target
+      }
+      for food in supplements where !state.customFoods.contains(where: { $0.id == food.id }) {
+        state.customFoods.append(food)
+      }
+      state.personalTargetVersion = 1
     }
     return state
   }
@@ -469,7 +493,7 @@ func number(_ value: Double) -> String {
   }
   func restore(_ data: Data) throws {
     let decoded = try JSONDecoder().decode(NativeState.self, from: data)
-    let candidate = Self.expanded(decoded, nutrients: nutrients)!
+    let candidate = Self.expanded(decoded, nutrients: nutrients, supplements: plannedSupplements)!
     guard Self.valid(candidate, nutrients: nutrients, foods: sampleFoods) else {
       throw NSError(
         domain: "Nutrient", code: 1,

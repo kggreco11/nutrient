@@ -30,6 +30,7 @@ test("legacy target migration preserves custom treatment targets, macros, histor
 });
 test("recorded shortfall patterns distinguish complete, partial, and entirely unknown days", () => {
   const s = initialState();
+  s.targets.vitD = 15; // Pin this percentage fixture independently of the personal plan.
   const food = (id, value, partial = false) => ({
     id,
     calories: 0,
