@@ -120,6 +120,8 @@ export function nutrientPatterns(state, catalog, endDate, months = 6) {
     })
     .filter((n) => n.knownDays);
   return {
+    records,
+    loggedDays: days.length,
     below: [...records]
       .filter((n) => n.below)
       .sort(

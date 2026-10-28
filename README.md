@@ -20,7 +20,11 @@ npm run ios:sync
 npm run ios:open
 ```
 
-`npm run build` creates `dist/client` for the native app, and `dist/server/index.js` for the hosted Worker. Native builds never contain the server's OpenRouter key. The Xcode bundle ID is `com.kggreco11.nutrient`, using Capacitor 8 with Swift Package Manager. A simulator build needs no signing; installing on an iPhone requires your Apple signing team.
+The iPhone app is written in **SwiftUI**, with a native `TabView`, `NavigationStack`, forms, lists and Swift Charts. `SceneDelegate.swift` hosts `NutrientAppView` directly. It does not load a web view, HTML, CSS, JavaScript or Capacitor runtime. Minimum deployment target: iOS 17. Bundle ID: `com.kggreco11.nutrient`.
+
+`npm run ios:sync` refreshes the bundled USDA dataset and reference targets from the shared data sources. Open `ios/App/App.xcodeproj` in Xcode to build and run. The native interface lives in `NativeApp.swift`; persistence/calculations in `NativeModels.swift`; networking and Keychain access in `NativeBackend.swift`; camera and dictation in `NativeCapture.swift`.
+
+The web companion is a separate Vite application. `npm run build` produces `dist/client` for the website and `dist/server/index.js` for the hosted assistant backend. Those website assets are not included in the iPhone bundle. Legacy Capacitor files remain for migration reference and web utilities, but the Xcode app target has no Capacitor dependency or web resources.
 
 ## Conversational logging
 
@@ -39,9 +43,9 @@ The single source of assistant instructions is [`server/policy.js`](server/polic
 
 Copy `.env.example` to ignored `.env.local` and set `OPENROUTER_API_KEY` locally. Do not paste the key into chat, app fields, source code, Vite client variables, or a GitHub commit. Restart the dev server after changing this file. `OPENROUTER_MODEL` defaults to `deepseek/deepseek-v4.1-flash`.
 
-For the hosted Worker, configure these as server runtime values in the hosting service. Local `.env.local` values are not uploaded or automatically deployed. Model tokens and web tools consume OpenRouter credits. The app's nutrient views and manual food logging work without an AI key. No live model test can run until a real key is configured; automated tests mock provider responses.
+For the hosted Worker, configure these as server runtime values in the hosting service. Local `.env.local` values are not uploaded or automatically deployed. Model tokens and web tools consume OpenRouter credits. The app's nutrient views and manual food logging work without an AI key. Automated server tests mock provider responses; live checks are documented separately.
 
-`GET /api/status` reports whether a provider key is configured, without returning it. `POST /api/chat` runs a user-triggered conversation turn. Private hosted access is enforced by Sites. Standalone/native API deployments can use a separate `NUTRIENT_API_TOKEN`; do not use the OpenRouter key as an app access token. The iOS Connection settings accept an HTTPS backend URL and an optional session-only access token. Calling a private Sites backend from iOS also requires its service-access token; the app sends the supplied access token in the appropriate service header. No credentials are included in backups.
+`GET /api/status` reports whether a provider key is configured, without returning it. `POST /api/chat` runs a user-triggered conversation turn. Private hosted access is enforced by Sites. Standalone/native API deployments can use a separate `NUTRIENT_API_TOKEN`; do not use the OpenRouter key as an app access token. The native app calls the private hosted assistant using URLSession and a service-access credential stored in iOS Keychain. Settings → Chat connection can reconnect the service. Development provisioning may supply `NUTRIENT_SERVICE_TOKEN` as a launch environment variable; it is saved to Keychain and removed from the app's process environment. It is not the OpenRouter key. Neither credential is bundled, committed or included in backups.
 
 ## Nutrition data
 
@@ -72,17 +76,15 @@ Editing a saved food creates a new version and archives the old one, preserving 
 
 ## Trends
 
-Select 3, 6 or 12 months and an overall score, energy or individual nutrient. The chart shows monthly averages and the target line. Empty days and initial sample entries are excluded. Per-nutrient averages exclude days with no reported value for that nutrient. The nutrient grid shows monthly coverage, and summaries rank nutrients most often below, met or above target. These are deterministic calculations performed when you open Trends; no model calls, polling jobs, forecasts or ongoing analysis are involved.
+Select 3, 6 or 12 months and an overall score, energy or individual nutrient. The chart shows monthly averages and the target line. Empty days and initial sample entries are excluded. Per-nutrient averages exclude days with no reported value for that nutrient. The nutrient grid shows monthly coverage, and an intake summary lists average daily amounts, targets and gaps, sorted by lowest target coverage. One recorded day is not described as a recurring pattern. These are deterministic calculations performed when you open Trends; no model calls, polling jobs, forecasts or ongoing analysis are involved.
 
 Overall score is the mean of 18 capped nutrient-coverage percentages (10 vitamins, 6 minerals, fiber and omega-3), rounded to an integer. Macros and energy are separate. A nutrient above target cannot mask a gap in another. Individual nutrient trends retain percentages above 100 so over-target patterns stay visible. Targets are current, editable examples, not personalized clinical recommendations. Coverage does not assess absorption, health, nutrient interactions or safe upper limits.
 
 ## iOS camera, dictation and data
 
-The native app uses the official Capacitor barcode scanner; web preview uses ZXing with the rear-facing camera where available. Camera frames are processed on-device; only decoded barcode digits are sent for product lookup. Camera access is requested only after tapping Scan.
+The native scanner uses AVFoundation's camera and barcode recognition. Web preview uses ZXing. Camera frames are processed on-device; decoded digits are sent to Open Food Facts. Native dictation uses Apple's Speech and AVFoundation APIs. A transcript is sent to the assistant only when Send is tapped. Hardware recognition still needs a physical camera/microphone acceptance check.
 
-Native dictation uses the app's Swift `NutrientSpeechPlugin` with Apple's Speech/AVFoundation APIs. Browser dictation uses the browser's available SpeechRecognition service. Speech recognition may use the device/vendor's recognition service; a transcript is not sent to the nutrition assistant until the user taps Send. Microphone/speech permissions, stop controls and a Preferences privacy manifest are configured. Camera and microphone operation must still be tested on a physical iPhone; a simulator build cannot prove those work on hardware.
-
-Native diary data persists through Capacitor Preferences; web data uses localStorage. Data is local to the device/origin and removed on uninstall or clearing site data. There is no cross-device account sync. Export/import JSON backs up and transfers the diary, targets, saved meals and supplements. Import validates records and asks before replacing data.
+Native diary data persists as an atomic JSON file in Application Support. Existing Capacitor Preferences data is read on first migration; future saves also retain a compatible preferences copy. Unreadable data is saved separately for recovery. Web data uses localStorage. There is no account synchronization. Export/import JSON transfers diary entries, targets and the saved library; import validates records and asks before replacing data. The private chat credential stays in Keychain.
 
 The initial **Sample day** and 16 illustrative foods are explicitly labeled. Start fresh removes sample entries. Historical patterns exclude sample entries even if you add real food on the sample date.
 
@@ -98,4 +100,4 @@ Tracked micronutrient defaults now use U.S./Canadian male age 19–30 RDA/AI val
 
 On first load, legacy default values migrate once; values differing from the old defaults are preserved. A previously customized value identical to an old default cannot be distinguished from an untouched default. Imported legacy backups use the same migration. Historical entries are unchanged; charts compare them against current targets.
 
-Pattern summaries describe recorded intake and report complete versus reported days, plus entirely unknown days. Days without any reported value for a nutrient are excluded from that nutrient's averages. Partial records can understate intake. The app does not diagnose deficiencies or recommend supplements.
+Intake summaries describe recorded intake and report complete versus reported days, plus entirely unknown days. Days without any reported value for a nutrient are excluded from that nutrient's averages. Partial records can understate intake. The app does not diagnose deficiencies or recommend supplements.

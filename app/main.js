@@ -1,4 +1,7 @@
 import "./style.css";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+import { sendChat } from "./chat-client.js";
 import { migrateReferenceTargets } from "./targets.js";
 import { nutrients, foods, meals, initialState, localDate } from "./data.js";
 import { totals, coverage, score, status, validState } from "./model.js";
@@ -16,6 +19,7 @@ import {
   cameraError,
 } from "./scanner.js";
 const icons = {
+  mic: '<rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/>',
   camera:
     '<rect x="3" y="6" width="18" height="15" rx="3"/><circle cx="12" cy="13" r="4"/><path d="m7 6 2-3h6l2 3"/>',
   chat: '<path d="M21 11a9 9 0 0 1-9 9H4l-2 2V11a9 9 0 0 1 19 0Z"/><path d="M7 10h10M7 14h6"/>',
@@ -84,7 +88,15 @@ let scannerSession = null,
   trendMonths = 6,
   trendMetric = "score",
   builderItems = [],
-  chatHistory = [],
+  chatHistory = Array.isArray(state.chatHistory)
+    ? state.chatHistory
+        .filter(
+          (m) =>
+            ["user", "assistant"].includes(m.role) &&
+            typeof m.content === "string",
+        )
+        .slice(-100)
+    : [],
   agentReply = "",
   agentSources = [],
   agentTrace = [],
@@ -154,6 +166,7 @@ function dateLabel() {
 }
 function shell() {
   stopDictation();
+  document.body.dataset.view = view;
   const nav = [
     "Overview",
     "Food diary",
@@ -163,7 +176,7 @@ function shell() {
     "Trends",
   ];
   document.querySelector("#app").innerHTML = `
-<aside class="sidebar"><a class="brand" href="#overview" aria-label="Nutrient home"><span class="brand-mark">${icon("leaf")}</span>nutrient<span class="brand-dot">.</span></a><div class="workspace-label">YOUR DAILY PRACTICE</div><nav class="desktop-nav" aria-label="Main navigation">${nav.map((n, i) => `<button class="nav-item ${view === n ? "active" : ""}" data-view="${n}">${icon(["dashboard", "diary", "chat", "library", "nutrients", "trends"][i])}<span>${n}</span>${view === n ? '<span class="nav-dot"></span>' : ""}</button>`).join("")}</nav><nav class="mobile-nav" aria-label="Main navigation">${[
+<aside class="sidebar"><a class="brand" href="#overview" aria-label="Nutrient home"><span class="brand-mark">${icon("leaf")}</span>nutrient<span class="brand-dot">.</span></a><nav class="desktop-nav" aria-label="Main navigation">${nav.map((n, i) => `<button class="nav-item ${view === n ? "active" : ""}" data-view="${n}">${icon(["dashboard", "diary", "chat", "library", "nutrients", "trends"][i])}<span>${n}</span>${view === n ? '<span class="nav-dot"></span>' : ""}</button>`).join("")}</nav><nav class="mobile-nav" aria-label="Main navigation">${[
     ["Overview", "Today", "dashboard"],
     ["Food diary", "Diary", "diary"],
     ["Chat", "Chat", "chat"],
@@ -175,10 +188,10 @@ function shell() {
     )
     .join(
       "",
-    )}<button class="nav-item ${["Library", "Nutrients", "Settings"].includes(view) ? "active" : ""}" data-action="more" aria-haspopup="dialog"><span class="more-glyph" aria-hidden="true">•••</span><span>More</span></button></nav><div class="sidebar-bottom"><div class="free-note">${icon("leaf")}<strong>Good nutrition.<br>Open to everyone.</strong><p>Nutrient insights for everyone.<br>Always free.</p><span>NO PREMIUM REQUIRED ${icon("check")}</span></div><button class="nav-item ${view === "Settings" ? "active" : ""}" data-view="Settings">${icon("settings")} Targets & settings</button><div class="profile"><span class="avatar">Y</span><div><strong>Your personal space</strong><small>Stored on this device</small></div><span class="online-dot"></span></div></div></aside>
-<div class="main-shell"><header class="topbar"><span class="breadcrumb">My workspace <span>/</span> <strong>${view}</strong></span><div class="topbar-actions"><span class="private-badge"><i></i> Local & private</span><button class="icon-button" data-view="Settings" aria-label="Targets and settings">${icon("settings")}</button></div></header><main id="content"><div class="page-heading"><div><p class="eyebrow">A LITTLE MORE BALANCE, EVERY DAY</p><h1>${{ Overview: "Your daily picture.", "Food diary": "One bite at a time.", Nutrients: "The details that matter.", Trends: "Small steps. A fuller picture.", Settings: "Make it yours.", Chat: "Tell us what’s on your plate.", Library: "Your everyday favorites." }[view]}</h1><p class="subtitle">${{ Overview: "Look beyond calories. See what’s nourishing you.", "Food diary": "A simple record of what nourishes you.", Nutrients: "Every nutrient, with room to understand more.", Trends: "See how your nutrient coverage changes over time.", Settings: "Your targets, your food, your data.", Chat: "Describe a meal. Find its components. Make it yours.", Library: "Meals, foods, and supplements. Ready when you are." }[view]}</p></div>${view !== "Settings" ? '<button class="button primary" data-action="add">' + icon("plus") + " Log food</button>" : ""}</div>
-${view !== "Settings" ? `<div class="day-toolbar"><div class="date-control"><button class="icon-button" data-action="prev" aria-label="Previous day">${icon("back")}</button><label class="date-picker">${icon("calendar")}<strong>${dateLabel()}</strong><input type="date" id="date" value="${selectedDate}" aria-label="Choose diary date"></label><button class="icon-button" data-action="next" aria-label="Next day">${icon("arrow")}</button>${selectedDate === localDate() ? '<span class="today-tag">Today</span>' : '<button class="text-button" data-action="today">Today</button>'}</div><div class="day-meta">${day().demo ? '<span class="demo-badge">Sample day</span><button class="text-button" data-action="clear-demo">Start fresh ' + icon("arrow") + "</button>" : `<span>${day().entries.length} foods logged</span>`}</div></div>` : ""}
-<div id="view-content"></div><footer><span>${icon("leaf")} A fuller picture. A little more balance.</span><button class="text-button" data-action="method">How scores work ${icon("info")}</button></footer></main></div>`;
+    )}<button class="nav-item ${["Library", "Nutrients", "Settings"].includes(view) ? "active" : ""}" data-action="more" aria-haspopup="dialog"><span class="more-glyph" aria-hidden="true">•••</span><span>More</span></button></nav><div class="sidebar-bottom"><button class="nav-item ${view === "Settings" ? "active" : ""}" data-view="Settings">${icon("settings")} Targets & settings</button></div></aside>
+<div class="main-shell ${view === "Chat" ? "chat-shell" : ""}"><main id="content">${view !== "Chat" ? `<div class="page-heading"><h1>${{ Overview: "Today", "Food diary": "Diary", Nutrients: "Nutrients", Trends: "Trends", Settings: "Settings", Library: "Library" }[view]}</h1>${view !== "Settings" ? '<button class="button primary" data-action="add">' + icon("plus") + " Log food</button>" : ""}</div>` : ""}
+${!["Settings", "Chat"].includes(view) ? `<div class="day-toolbar"><div class="date-control"><button class="icon-button" data-action="prev" aria-label="Previous day">${icon("back")}</button><label class="date-picker">${icon("calendar")}<strong>${dateLabel()}</strong><input type="date" id="date" value="${selectedDate}" aria-label="Choose diary date"></label><button class="icon-button" data-action="next" aria-label="Next day">${icon("arrow")}</button>${selectedDate === localDate() ? '<span class="today-tag">Today</span>' : '<button class="text-button" data-action="today">Today</button>'}</div><div class="day-meta">${day().demo ? '<span class="demo-badge">Sample day</span><button class="text-button" data-action="clear-demo">Start fresh ' + icon("arrow") + "</button>" : `<span>${day().entries.length} foods logged</span>`}</div></div>` : ""}
+<div id="view-content"></div></main></div>`;
   const area = document.querySelector("#view-content");
   area.innerHTML =
     view === "Overview"
@@ -194,6 +207,10 @@ ${view !== "Settings" ? `<div class="day-toolbar"><div class="date-control"><but
               : view === "Chat"
                 ? chatPage()
                 : settings();
+  if (view === "Chat") {
+    const conversation = document.querySelector(".conversation");
+    conversation.scrollTop = conversation.scrollHeight;
+  }
 }
 function overview() {
   const v = values(),
@@ -210,7 +227,7 @@ function overview() {
     )
     .slice(0, 3);
   return `
-<section class="overview-grid"><article class="card score-card"><div class="card-kicker">THE BIG PICTURE <button class="icon-button small" data-action="method" aria-label="About nutrient scores">${icon("info")}</button></div><div class="score-content">${ring(s, 174)}<div class="score-copy"><span class="pill">${s >= 80 ? "Looking balanced" : s >= 50 ? "Building balance" : "A fresh start"}</span><h2>${s >= 80 ? "A well-nourished day." : s >= 50 ? "Good things are adding up." : "Every bite is a beginning."}</h2><p>${met} of 18 nutrient targets met.<br>Keep filling in your daily picture.</p><button class="text-button" data-view="Nutrients">Explore your nutrients ${icon("arrow")}</button></div></div><div class="score-source-note">Food only: ${score(
+<section class="overview-grid"><article class="card score-card"><div class="card-kicker">NUTRIENT SCORE <button class="icon-button small" data-action="method" aria-label="About nutrient scores">${icon("info")}</button></div><div class="score-content">${ring(s, 174)}<div class="score-copy"><h2>${met} of 18 targets met</h2><button class="text-button" data-view="Nutrients">Explore your nutrients ${icon("arrow")}</button></div></div><div class="score-source-note">Food only: ${score(
     totals(
       day().entries.filter(
         (e) =>
@@ -230,8 +247,8 @@ function overview() {
       return `<div><span><i class="dot macro-${i}"></i>${id === "carbs" ? "Carbs" : n.name}</span><strong>${fmt(v[id])}<small> / ${state.targets[id]} g</small></strong><div class="tiny-track"><i class="macro-${i}" style="width:${coverage(v[id], state.targets[id])}%"></i></div></div>`;
     })
     .join("")}</div></article></section>
-<div class="section-heading"><div><h2>Your nutrient landscape</h2><p>The small things that make a big difference.</p></div><button class="text-button" data-view="Nutrients">See all nutrients ${icon("arrow")}</button></div><section class="category-grid">${categoryCard("Vitamins", "10 essential vitamins", "sun", v)}${categoryCard("Minerals", "6 everyday essentials", "nutrients", v)}${categoryCard("Other", "Fiber & omega-3", "leaf", v)}</section>
-<section class="lower-grid"><article class="card diary-preview"><div class="section-heading compact"><h2>On your plate</h2><button class="text-button" data-view="Food diary">Open diary ${icon("arrow")}</button></div>${mealSummary()}<button class="add-line" data-action="add">${icon("plus")} Add something nourishing</button></article><div class="right-stack"><article class="opportunity-card"><div class="card-kicker">A LITTLE ROOM TO GROW ${icon("leaf")}</div><h2>Fill in the gaps.</h2><p>Your lowest coverage today. Tap a nutrient to see which foods contribute.</p><div class="gap-list">${low.map((n) => `<button data-nutrient="${n.id}"><span>${n.name}</span><strong>${Math.round(coverage(v[n.id], state.targets[n.id]))}% ${icon("arrow")}</strong></button>`).join("")}</div></article><article class="card water-card"><div><h3>${icon("drop")} A moment to hydrate</h3><p><strong>${day().water}</strong> / ${state.waterTarget} glasses <span>· 250 mL each</span></p></div><div class="water-actions"><button class="icon-button" data-action="water-minus" aria-label="Remove a glass of water" ${day().water === 0 ? "disabled" : ""}>−</button><button class="icon-button water-plus" data-action="water-plus" aria-label="Add a glass of water" ${day().water >= 30 ? "disabled" : ""}>${icon("plus")}</button></div></article></div></section>`;
+<div class="section-heading"><div><h2>Nutrients</h2></div><button class="text-button" data-view="Nutrients">See all nutrients ${icon("arrow")}</button></div><section class="category-grid">${categoryCard("Vitamins", "10 essential vitamins", "sun", v)}${categoryCard("Minerals", "6 everyday essentials", "nutrients", v)}${categoryCard("Other", "Fiber & omega-3", "leaf", v)}</section>
+<section class="lower-grid"><article class="card diary-preview"><div class="section-heading compact"><h2>On your plate</h2><button class="text-button" data-view="Food diary">Open diary ${icon("arrow")}</button></div>${mealSummary()}<button class="add-line" data-action="add">${icon("plus")} Add food</button></article><div class="right-stack"><article class="opportunity-card"><div class="card-kicker">LOWEST RECORDED INTAKE ${icon("leaf")}</div><h2>Below target</h2><p>Your lowest coverage today. Tap a nutrient to see which foods contribute.</p><div class="gap-list">${low.map((n) => `<button data-nutrient="${n.id}"><span>${n.name}</span><strong>${Math.round(coverage(v[n.id], state.targets[n.id]))}% ${icon("arrow")}</strong></button>`).join("")}</div></article><article class="card water-card"><div><h3>${icon("drop")} Water</h3><p><strong>${day().water}</strong> / ${state.waterTarget} glasses <span>· 250 mL each</span></p></div><div class="water-actions"><button class="icon-button" data-action="water-minus" aria-label="Remove a glass of water" ${day().water === 0 ? "disabled" : ""}>−</button><button class="icon-button water-plus" data-action="water-plus" aria-label="Add a glass of water" ${day().water >= 30 ? "disabled" : ""}>${icon("plus")}</button></div></article></div></section>`;
 }
 function categoryCard(group, label, ico, v) {
   const s = score(v, state.targets, group),
@@ -244,7 +261,7 @@ function mealSummary() {
     .map((m, i) => {
       const entries = day().entries.filter((e) => e.meal === m),
         t = totals(entries, catalog());
-      return `<button class="meal-summary" data-meal-view="${m}"><span class="meal-icon">${["☀", "◒", "☾", "◈", "✧"][i]}</span><span class="meal-text"><strong>${m}</strong><small>${entries.length ? entries.map((e) => esc(catalog().find((f) => f.id === e.foodId)?.name || "Unknown food")).join(", ") : "A little space for something good"}</small></span><span class="meal-kcal">${fmt(t.calories)}<small>kcal</small></span>${icon("arrow")}</button>`;
+      return `<button class="meal-summary" data-meal-view="${m}"><span class="meal-icon">${["☀", "◒", "☾", "◈", "✧"][i]}</span><span class="meal-text"><strong>${m}</strong><small>${entries.length ? entries.map((e) => esc(catalog().find((f) => f.id === e.foodId)?.name || "Unknown food")).join(", ") : "No entries"}</small></span><span class="meal-kcal">${fmt(t.calories)}<small>kcal</small></span>${icon("arrow")}</button>`;
     })
     .join("");
 }
@@ -306,6 +323,8 @@ function trends() {
         : trendMetric === "score"
           ? "/100"
           : "%";
+  const firstMonth = buckets.findIndex((b) => b.loggedDays > 0);
+  const plottedBuckets = buckets.slice(firstMonth < 0 ? -1 : firstMonth);
   const max =
     trendMetric === "calories"
       ? Math.max(state.calorieTarget, ...buckets.map((b) => b.average || 0))
@@ -316,18 +335,7 @@ function trends() {
     selectedDate,
     trendMonths,
   );
-  return `<div class="trend-controls"><div class="tabs" aria-label="Trend range">${[3, 6, 12].map((n) => `<button data-months="${n}" aria-pressed="${trendMonths === n}" class="${trendMonths === n ? "selected" : ""}">${n} months</button>`).join("")}</div><label>Show<select id="trend-metric"><option value="score">Nutrient score</option><option value="calories" ${trendMetric === "calories" ? "selected" : ""}>Energy</option>${nutrients.map((n) => `<option value="${n.id}" ${trendMetric === n.id ? "selected" : ""}>${n.name} coverage</option>`).join("")}</select></label></div><div class="trend-stats"><article class="card"><span class="card-kicker">${trendMonths}-MONTH AVERAGE</span><strong>${logged ? Math.round(avg) : "—"}<small>${unit}</small></strong><p>Across ${logged} logged ${logged === 1 ? "day" : "days"}</p></article><article class="card"><span class="card-kicker">SUPPLEMENT DAYS</span><strong>${buckets.reduce((sum, b) => sum + b.supplementDays, 0)}</strong><p>Logged alongside your meals</p></article><article class="card"><span class="card-kicker">THE LONGER VIEW</span><h2>Patterns over perfection.</h2><p>Sample entries are excluded. Empty days stay empty.</p></article></div><div class="pattern-grid">${[
-    ["Most often recorded below", patterns.below, "below"],
-    ["Most consistently met", patterns.met, "met"],
-    ["Most often above", patterns.above, "above"],
-  ]
-    .map(
-      ([title, list, key]) =>
-        `<article class="card pattern-card"><h3>${title}</h3>${list.map((n) => `<div><span>${n.name}</span><strong>${n[key]} / ${n.knownDays} days</strong><small>Recorded average ${Math.round(n.average)}% · ${n.completeDays} complete / ${n.knownDays} reported days${n.unreportedDays ? ` · ${n.unreportedDays} unknown days` : ""}</small></div>`).join("") || "<p>No pattern yet. Add more entries.</p>"}</article>`,
-    )
-    .join(
-      "",
-    )}</div><article class="card trend-chart"><div class="section-heading compact"><div><h2>${trendMetric === "score" ? "Nutrient score" : trendMetric === "calories" ? "Energy" : nutrients.find((n) => n.id === trendMetric).name + " coverage"} by month</h2><p>Monthly averages through ${dateLabel()}</p></div><span class="pill">${trendMonths} months</span></div><div class="monthly-chart"><div class="monthly-grid"><span>${Math.round(max)}</span><span>${Math.round(max / 2)}</span><span>0</span></div><div class="monthly-bars"><div class="monthly-target-line" style="top:calc(var(--plot-height) * ${1 - (trendMetric === "calories" ? state.calorieTarget : 100) / max})"><span>Target ${trendMetric === "calories" ? state.calorieTarget + " kcal" : "100%"}</span></div>${buckets.map((b) => `<button class="month-column" data-month-detail="${b.key}" aria-label="${b.label} ${b.year}: ${b.average === null ? "no logged days" : Math.round(b.average) + " " + unit}"><div class="month-bar-slot"><span>${b.average === null ? "—" : Math.round(b.average)}</span><div class="month-bar" style="height:${b.average === null ? 0 : Math.min(100, (b.average / max) * 100)}%"><i style="height:${b.average ? Math.min(100, ((b.foodOnly || 0) / b.average) * 100) : 0}%"></i></div></div><strong>${b.label}</strong><small>${b.year}</small><small>${b.loggedDays} days</small></button>`).join("")}</div></div><div class="chart-legend"><span><i class="dot olive"></i> Food contribution</span><span><i class="dot supplement-color"></i> With supplements</span></div><p class="data-note">Only days with real entries count. Scores use current targets. The collective score is capped at 100; individual nutrient percentages can exceed target. Above-target does not imply harm or a safe upper limit. Incomplete records can understate intake; recorded shortfalls are not diagnosed deficiencies. Tap a month for its logged days.</p></article><div class="section-heading"><div><h2>Coverage across nutrients</h2><p>Each square is one monthly average. Gaps mean no reported values. Partial records can understate intake.</p></div></div><div class="card heatmap-card"><div class="heatmap-heading"><span>NUTRIENT</span>${buckets.map((b) => `<span>${b.label}</span>`).join("")}</div>${monthlyNutrients(
+  return `<div class="trend-controls"><div class="tabs" aria-label="Trend range">${[3, 6, 12].map((n) => `<button data-months="${n}" aria-pressed="${trendMonths === n}" class="${trendMonths === n ? "selected" : ""}">${n} months</button>`).join("")}</div><label>Show<select id="trend-metric"><option value="score">Nutrient score</option><option value="calories" ${trendMetric === "calories" ? "selected" : ""}>Energy</option>${nutrients.map((n) => `<option value="${n.id}" ${trendMetric === n.id ? "selected" : ""}>${n.name} coverage</option>`).join("")}</select></label></div>${intakeSummary(patterns)}<article class="card trend-chart"><div class="section-heading compact"><div><h2>${trendMetric === "score" ? "Nutrient score" : trendMetric === "calories" ? "Energy" : nutrients.find((n) => n.id === trendMetric).name + " coverage"} by month</h2><p>Monthly averages through ${dateLabel()}</p></div><span class="pill">${trendMonths} months</span></div><div class="monthly-chart"><div class="monthly-grid"><span>${Math.round(max)}</span><span>${Math.round(max / 2)}</span><span>0</span></div><div class="monthly-bars"><div class="monthly-target-line" style="top:calc(var(--plot-height) * ${1 - (trendMetric === "calories" ? state.calorieTarget : 100) / max})"><span>Target ${trendMetric === "calories" ? state.calorieTarget + " kcal" : "100%"}</span></div>${plottedBuckets.map((b) => `<button class="month-column" data-month-detail="${b.key}" aria-label="${b.label} ${b.year}: ${b.average === null ? "no logged days" : Math.round(b.average) + " " + unit}"><div class="month-bar-slot"><span>${b.average === null ? "—" : Math.round(b.average)}</span><div class="month-bar" style="height:${b.average === null ? 0 : Math.min(100, (b.average / max) * 100)}%"><i style="height:${b.average ? Math.min(100, ((b.foodOnly || 0) / b.average) * 100) : 0}%"></i></div></div><strong>${b.label}</strong><small>${b.year}</small><small>${b.loggedDays} days</small></button>`).join("")}</div></div><div class="chart-legend"><span><i class="dot olive"></i> Food contribution</span><span><i class="dot supplement-color"></i> With supplements</span></div></article><div class="section-heading"><div><h2>Coverage across nutrients</h2><p>Monthly average as a percentage of your target.</p></div></div><div class="card heatmap-card"><div class="heatmap-heading"><span>NUTRIENT</span>${buckets.map((b) => `<span>${b.label}</span>`).join("")}</div>${monthlyNutrients(
     state,
     catalog(),
     selectedDate,
@@ -339,8 +347,18 @@ function trends() {
     )
     .join("")}</div>`;
 }
+function intakeSummary(patterns) {
+  const rows = [...patterns.records].sort((a, b) => a.average - b.average);
+  const row = (n) => {
+    const actual = (state.targets[n.id] * n.average) / 100;
+    const gap = Math.max(0, state.targets[n.id] - actual);
+    const partial = n.completeDays < n.knownDays;
+    return `<div class="intake-line"><span>${n.name}${partial ? "<small>Partial data</small>" : ""}</span><span><strong>${fmt(actual)} ${n.unit}</strong><small>Target ${fmt(state.targets[n.id])} ${n.unit}</small></span><span><strong>${gap > 0 ? fmt(gap) + " " + n.unit : "Met"}</strong><small>${Math.round(n.average)}% of target</small></span></div>`;
+  };
+  return `<section class="card intake-summary"><header><h2>Average intake</h2><span>${patterns.loggedDays} ${patterns.loggedDays === 1 ? "day" : "days"} logged · ${trendMonths} months</span></header>${rows.length ? `<div class="intake-line labels"><span>Nutrient</span><span>Daily average</span><span>Recorded gap</span></div>${rows.slice(0, 6).map(row).join("")}${rows.length > 6 ? `<details><summary>All nutrients</summary>${rows.slice(6).map(row).join("")}</details>` : ""}` : "<p>Log meals to see your averages and gaps.</p>"}</section>`;
+}
 function settings() {
-  return `<section class="settings-grid"><article class="card settings-card"><p class="eyebrow">YOUR DAILY BASELINE</p><h2>Nutrition targets</h2><p class="subtitle">Micronutrient references: male, age 19–30 (RDA/AI). Custom targets stay editable. These are intake references, not deficiency-treatment doses.</p><form id="targets-form"><div class="target-fields"><label>Energy <span>kcal</span><input name="calorieTarget" type="number" min="1" max="20000" required value="${state.calorieTarget}"></label><label>Water <span>glasses</span><input name="waterTarget" type="number" min="1" max="30" step="1" required value="${state.waterTarget}"></label>${nutrients.map((n) => `<label>${n.name}<span>${n.unit}</span><input type="number" name="${n.id}" value="${state.targets[n.id]}" min="0.01" max="100000" step="any" required></label>`).join("")}</div><button class="button primary" type="submit">${icon("check")} Save targets</button></form></article><div class="right-stack"><article class="card settings-card"><p class="eyebrow">YOUR ASSISTANT</p><h2>OpenRouter connection</h2><p>The model and provider key are configured on the server. The app never stores the OpenRouter key.</p><form id="connection-form"><label class="field-label">Backend URL<input name="base" type="url" value="${esc(apiBase())}" placeholder="Same origin on web"></label><label class="field-label">App access token (optional)<input name="token" type="password" autocomplete="off" placeholder="Session only · not your OpenRouter key"></label><button class="button secondary">Save connection</button></form><p class="quiet small-copy">A separate app token can connect the native iOS app to a private backend. It stays in this session and is excluded from backups.</p></article><article class="card settings-card"><p class="eyebrow">ALWAYS YOURS</p><h2>Your data belongs to you.</h2><p>Food logs, targets, and your food library stay in this browser. Barcode lookups send only the product code to Open Food Facts. Export a backup to keep them safe or move them to another device.</p><button class="button secondary full" data-action="export">${icon("download")} Export all data</button><label class="button secondary full import-label">${icon("plus")} Import backup<input id="import-file" type="file" accept="application/json,.json"></label><p class="quiet small-copy">Import replaces this browser’s data after confirmation.</p></article><article class="card settings-card"><h2>A note on the numbers</h2><p>This is an independent, free tracker. Built-in foods contain illustrative values and are labeled as samples. Custom foods let you enter label values. Barcode lookup uses community data from <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener noreferrer">Open Food Facts</a> (ODbL). Check imported values against the package; missing nutrients remain unknown.</p><p>The score tracks coverage, not clinical health, nutrient balance, or safe upper limits. Micronutrient defaults use male age 19–30 reference intakes. A vitamin D intake percentage does not measure your blood vitamin D status or replace a prescribed treatment target. <a href="https://www.canada.ca/en/health-canada/services/food-nutrition/healthy-eating/dietary-reference-intakes/tables/reference-values-vitamins.html" target="_blank" rel="noopener noreferrer">Vitamin references</a> · <a href="https://www.canada.ca/en/health-canada/services/food-nutrition/healthy-eating/dietary-reference-intakes/tables/reference-values-elements.html" target="_blank" rel="noopener noreferrer">Mineral references</a>.</p><button class="text-button" data-action="method">Read the scoring method ${icon("arrow")}</button></article><article class="card settings-card"><h2>Your food library</h2><p>${foods.length} sample foods · ${state.customFoods.length} saved foods</p><button class="button secondary" data-action="custom">${icon("plus")} Create a custom food</button></article></div></section>`;
+  return `<section class="settings-grid"><article class="card settings-card"><p class="eyebrow">YOUR DAILY BASELINE</p><h2>Nutrition targets</h2><p class="subtitle">Micronutrient references: male, age 19–30 (RDA/AI). Custom targets stay editable. These are intake references, not deficiency-treatment doses.</p><form id="targets-form"><div class="target-fields"><label>Energy <span>kcal</span><input name="calorieTarget" type="number" min="1" max="20000" required value="${state.calorieTarget}"></label><label>Water <span>glasses</span><input name="waterTarget" type="number" min="1" max="30" step="1" required value="${state.waterTarget}"></label>${nutrients.map((n) => `<label>${n.name}<span>${n.unit}</span><input type="number" name="${n.id}" value="${state.targets[n.id]}" min="0.01" max="100000" step="any" required></label>`).join("")}</div><button class="button primary" type="submit">${icon("check")} Save targets</button></form></article><div class="right-stack"><article class="card settings-card"><p class="eyebrow">YOUR ASSISTANT</p><h2>Chat connection</h2><details><summary>Advanced connection</summary><form id="connection-form"><label class="field-label">Backend URL<input name="base" type="url" value="${esc(apiBase())}" placeholder="Same origin on web"></label><label class="field-label">App access token (optional)<input name="token" type="password" autocomplete="off" placeholder="Connection token"></label><button class="button secondary">Save connection</button></form></details></article><article class="card settings-card"><p class="eyebrow">ALWAYS YOURS</p><h2>Your data belongs to you.</h2><p>Food logs, targets, and your food library stay in this browser. Barcode lookups send only the product code to Open Food Facts. Export a backup to keep them safe or move them to another device.</p><button class="button secondary full" data-action="export">${icon("download")} Export all data</button><label class="button secondary full import-label">${icon("plus")} Import backup<input id="import-file" type="file" accept="application/json,.json"></label><p class="quiet small-copy">Import replaces this browser’s data after confirmation.</p></article><article class="card settings-card"><h2>A note on the numbers</h2><p>This is an independent, free tracker. Built-in foods contain illustrative values and are labeled as samples. Custom foods let you enter label values. Barcode lookup uses community data from <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener noreferrer">Open Food Facts</a> (ODbL). Check imported values against the package; missing nutrients remain unknown.</p><p>The score tracks coverage, not clinical health, nutrient balance, or safe upper limits. Micronutrient defaults use male age 19–30 reference intakes. A vitamin D intake percentage does not measure your blood vitamin D status or replace a prescribed treatment target. <a href="https://www.canada.ca/en/health-canada/services/food-nutrition/healthy-eating/dietary-reference-intakes/tables/reference-values-vitamins.html" target="_blank" rel="noopener noreferrer">Vitamin references</a> · <a href="https://www.canada.ca/en/health-canada/services/food-nutrition/healthy-eating/dietary-reference-intakes/tables/reference-values-elements.html" target="_blank" rel="noopener noreferrer">Mineral references</a>.</p><button class="text-button" data-action="method">Read the scoring method ${icon("arrow")}</button></article><article class="card settings-card"><h2>Your food library</h2><p>${foods.length} sample foods · ${state.customFoods.length} saved foods</p><button class="button secondary" data-action="custom">${icon("plus")} Create a custom food</button></article></div></section>`;
 }
 function addDialog(m = "Breakfast") {
   meal = m;
@@ -589,13 +607,15 @@ function renderBuilderItems() {
     .join("");
 }
 function chatPage() {
-  return `<section class="chat-layout"><article class="card chat-panel"><div class="chat-heading"><span class="element-icon">${icon("chat")}</span><div><strong>Your food, figured out.</strong><small>Nutrition databases first · OpenRouter assistant</small></div><span class="pill">Database first</span></div><div class="conversation"><div class="chat-bubble assistant-bubble"><p>Tell me what you ate. I’ll look in your saved foods and nutrition databases, ask about anything unclear, and search official sources only when a database falls short.</p><p class="quiet">Nothing is logged until you review and confirm. You can also <button class="text-button" data-action="database-search">search the database yourself</button>.</p></div>${chatHistory.map((m) => `<div class="chat-bubble ${m.role === "user" ? "user-bubble" : "assistant-bubble"}">${esc(m.content)}</div>`).join("")}<div id="chat-step">${chatStep()}</div></div><form id="chat-form" class="chat-composer"><label class="sr-only" for="chat-input">Describe a food or meal</label><textarea id="chat-input" name="message" rows="2" required maxlength="1000" placeholder="What’s on your plate?"></textarea><div class="composer-actions"><button class="button secondary" type="button" data-action="dictate">Speak</button><button class="button primary" type="submit" ${chatStage === "loading" ? "disabled" : ""}>${chatStage === "loading" ? "Looking it up…" : "Send"} ${icon("arrow")}</button></div></form><p class="chat-disclosure">Sending shares this conversation and your saved food library with the configured model through OpenRouter. Database and source lookups run only when you ask; there is no background AI analysis.</p></article><aside class="chat-side"><p class="eyebrow">A SIMPLER WAY TO LOG</p><h2>Describe.<br>Clarify.<br>Confirm.</h2><ol><li><strong>Search databases</strong><p>Saved foods, USDA and package barcodes.</p></li><li><strong>Ask what’s missing</strong><p>The assistant clarifies the meal and looks for official public nutrition sources if needed.</p></li><li><strong>Review before logging</strong><p>See portions, sources and missing nutrient data.</p></li></ol><button class="button secondary full" data-action="new-meal">Build a saved meal</button></aside></section>`;
+  const render = (text) =>
+    DOMPurify.sanitize(marked.parse(text, { breaks: true }));
+  return `<section class="chat-layout"><article class="chat-panel"><header class="chat-heading"><h1>Chat</h1><button class="icon-button" data-action="database-search" aria-label="Search foods">${icon("search")}</button></header><div class="conversation" role="log" aria-label="Conversation" aria-live="polite">${chatHistory.length ? chatHistory.map((m) => `<div class="chat-bubble ${m.role === "user" ? "user-bubble" : "assistant-bubble"}">${render(m.content)}</div>`).join("") : '<div class="chat-empty">What did you eat?</div>'}<div id="chat-step">${chatStep()}</div></div><form id="chat-form" class="chat-composer"><div class="composer-input"><button type="button" class="icon-button" data-action="scan" aria-label="Scan a barcode">${icon("camera")}</button><label class="sr-only" for="chat-input">Message</label><textarea id="chat-input" name="message" rows="1" required maxlength="6000" placeholder="Message…">${esc(chatText)}</textarea><button class="icon-button" type="button" data-action="dictate" aria-label="Dictate a meal">${icon("mic")}</button><button class="button primary send-button" type="submit" aria-label="Send message" ${chatStage === "loading" ? "disabled" : ""}>↑</button></div></form></article></section>`;
 }
 function chatStep() {
   if (chatError)
-    return `<div class="chat-bubble assistant-bubble"><p>${esc(chatError)}</p><div class="fallback-actions"><button class="text-button" data-action="database-search">Search food database</button><button class="text-button" data-view="Settings">Connection settings</button></div></div>`;
+    return `<div class="chat-bubble assistant-bubble"><p>${esc(chatError)}</p><div class="fallback-actions"><button class="text-button" data-action="retry-chat">Retry</button><button class="text-button" data-view="Settings">Connection</button></div></div>`;
   if (chatStage === "loading")
-    return '<div class="chat-bubble assistant-bubble">Looking for nutrition records and resolving the details…</div>';
+    return '<div class="chat-bubble assistant-bubble chat-loading" role="status">Looking up your meal…</div>';
   if (chatStage === "complete")
     return '<div class="chat-bubble assistant-bubble"><p>Logged. Your diary and today’s progress are updated.</p><button class="text-button" data-view="Food diary">Open diary</button></div>';
   if (chatStage === "review") return chatReview();
@@ -603,7 +623,7 @@ function chatStep() {
 }
 function chatReview() {
   const combined = combineFoods("Meal preview", chatItems, "preview");
-  return `<div class="chat-bubble assistant-bubble"><h3>Review your meal.</h3><div class="review-items">${chatItems.map((x) => `<div><strong>${esc(x.food.name)}</strong><span>${fmt(x.quantity)} × ${esc(x.food.serving)}</span><small>${esc(sourceLabel(x.food))}${safeUrl(x.food.sourceUrl) ? ` · <a href="${esc(safeUrl(x.food.sourceUrl))}" target="_blank" rel="noopener noreferrer">View source ↗</a>` : ""}</small></div>`).join("")}</div><div class="review-total"><strong>${fmt(combined.calories)} kcal</strong><span>${fmt(combined.values.protein || 0)} g protein · ${fmt(combined.values.carbs || 0)} g carbs</span></div><p class="data-note">${combined.partialNutrients.length} of 21 nutrients have at least one missing component value. Known contributions are included; missing values are not invented.</p><form id="chat-confirm"><label class="field-label">Log to<select name="meal">${meals.map((m) => `<option ${meal === m ? "selected" : ""}>${m}</option>`).join("")}</select></label><label class="field-label">Save as a reusable meal (optional)<input name="name" maxlength="100" placeholder="e.g. My usual breakfast"></label><p class="quiet">For ${dateLabel()}</p><button class="button primary full">Confirm & log meal</button></form></div>`;
+  return `<div class="chat-bubble assistant-bubble"><h3>Review your meal.</h3><div class="review-items">${chatItems.map((x) => `<div><strong>${esc(x.food.name)}</strong><span>${fmt(x.quantity)} × ${esc(x.food.serving)}</span><small>${esc(sourceLabel(x.food))}${safeUrl(x.food.sourceUrl) ? ` · <a href="${esc(safeUrl(x.food.sourceUrl))}" target="_blank" rel="noopener noreferrer">View source ↗</a>` : ""}</small></div>`).join("")}</div><div class="review-total"><strong>${fmt(combined.calories)} kcal</strong><span>${fmt(combined.values.protein || 0)} g protein · ${fmt(combined.values.carbs || 0)} g carbs</span></div><p class="review-data-count">${21 - combined.partialNutrients.length}/21 nutrients fully reported</p><form id="chat-confirm"><label class="field-label">Log to<select name="meal">${meals.map((m) => `<option ${meal === m ? "selected" : ""}>${m}</option>`).join("")}</select></label><details class="save-meal-details"><summary>Save this meal</summary><label class="field-label">Meal name<input name="name" maxlength="100" placeholder="e.g. My usual breakfast"></label></details><p class="quiet">For ${dateLabel()}</p><button class="button primary full">Confirm & log meal</button></form></div>`;
 }
 function refreshChat() {
   const step = document.querySelector("#chat-step");
@@ -617,46 +637,37 @@ function apiBase() {
       : "")
   );
 }
-async function beginChat(message) {
+async function beginChat(message, retry = false) {
   await stopDictation();
   if (chatStage === "loading") return;
-  chatHistory.push({ role: "user", content: message });
-  chatHistory = chatHistory.slice(-12);
+  if (retry) {
+    const index = chatHistory.findLastIndex((m) => m.role === "user");
+    chatHistory = chatHistory.slice(0, index + 1);
+  } else chatHistory.push({ role: "user", content: message });
+  chatHistory = chatHistory.slice(-100);
+  state.chatHistory = chatHistory;
+  chatText = "";
+  persist();
   chatItems = [];
   chatError = "";
   chatStage = "loading";
   shell();
   try {
-    const token = sessionStorage.getItem("nutrient-api-token");
-    const response = await fetch(apiBase() + "/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token
-          ? {
-              Authorization: "Bearer " + token,
-              "OAI-Sites-Authorization": "Bearer " + token,
-            }
-          : {}),
-      },
-      credentials: "include",
-      body: JSON.stringify({
-        messages: chatHistory,
+    const result = await sendChat(
+      {
+        messages: chatHistory.slice(-12),
         savedFoods: state.customFoods.filter((f) => !f.archived),
-      }),
-      signal: AbortSignal.timeout(180000),
-    });
-    const type = response.headers.get("content-type") || "";
-    if (!type.includes("application/json"))
-      throw Error(
-        "The assistant backend is not connected at this address. Manual database search and logging are available.",
-      );
-    const result = await response.json();
-    if (!response.ok)
-      throw Error(result.error || "Unable to complete this request.");
+      },
+      {
+        base: apiBase(),
+        token: sessionStorage.getItem("nutrient-api-token") || "",
+      },
+    );
     agentSources = result.sources || [];
     agentTrace = result.trace || [];
     chatHistory.push({ role: "assistant", content: result.reply });
+    state.chatHistory = chatHistory;
+    persist();
     if (result.proposal?.length) {
       chatItems = result.proposal;
       chatStage = "review";
@@ -768,6 +779,10 @@ document.addEventListener("click", (event) => {
   const action = el.dataset.action;
   if (action === "close") closeModal();
   if (action === "add") addDialog();
+  if (action === "retry-chat") {
+    const last = chatHistory.filter((m) => m.role === "user").at(-1);
+    if (last) beginChat(last.content, true);
+  }
   if (action === "custom") customDialog();
   if (action === "supplement") customDialog("supplement");
   if (action === "scan") scanDialog();
@@ -1062,10 +1077,15 @@ document.addEventListener("click", async (event) => {
         (text) => {
           const input = document.querySelector("#chat-input");
           if (input) input.value = text;
+          chatText = text;
         },
         (listening) => {
           el.dataset.listening = String(listening);
-          el.textContent = listening ? "Stop" : "Speak";
+          el.textContent = listening ? "■" : "◉";
+          el.setAttribute(
+            "aria-label",
+            listening ? "Stop dictation" : "Dictate a meal",
+          );
         },
       );
     } catch (error) {
@@ -1080,6 +1100,11 @@ document.addEventListener("click", async (event) => {
   if (action === "retry-database") renderDatabaseResults();
 });
 document.addEventListener("input", (e) => {
+  if (e.target.id === "chat-input") {
+    chatText = e.target.value;
+    e.target.style.height = "auto";
+    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+  }
   if (e.target.id === "database-query") renderDatabaseResults();
   if (e.target.id === "library-search") {
     libraryQuery = e.target.value;
@@ -1133,8 +1158,9 @@ document.addEventListener("submit", async (e) => {
       return;
     }
     localStorage.setItem("nutrient-api-base", base);
-    if (data.get("token"))
+    if (data.get("token")) {
       sessionStorage.setItem("nutrient-api-token", data.get("token"));
+    }
     toast("Connection saved. The provider key stays on the server.");
   }
   if (form.id === "chat-form") {
@@ -1176,3 +1202,31 @@ modal.addEventListener("close", stopScanner);
 shell();
 if (storageError)
   toast("Saved data could not be loaded. The sample diary is shown.");
+
+function fitChatViewport() {
+  const viewport = window.visualViewport;
+  document.documentElement.style.setProperty(
+    "--app-height",
+    `${viewport?.height || window.innerHeight}px`,
+  );
+  document.body.dataset.keyboard = String(
+    !!viewport && viewport.height < window.innerHeight * 0.8,
+  );
+}
+window.visualViewport?.addEventListener("resize", fitChatViewport);
+window.addEventListener("resize", fitChatViewport);
+fitChatViewport();
+
+document.addEventListener("keydown", (event) => {
+  if (
+    event.target.id === "chat-input" &&
+    event.key === "Enter" &&
+    !event.shiftKey &&
+    !event.isComposing &&
+    window.innerWidth > 700
+  ) {
+    event.preventDefault();
+    if (chatStage !== "loading")
+      document.querySelector("#chat-form")?.requestSubmit();
+  }
+});

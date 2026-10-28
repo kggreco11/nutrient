@@ -19,3 +19,15 @@ Source under test: `06166f181cf8f3102f1e128bcacc61500ecce25c`. Provider: OpenRou
 - Web extraction is a reviewable model output. The harness checks citation membership and numeric structure, not semantic correctness of every source or portion.
 
 Evidence images are local ignored artifacts: `artifacts/live-meal-review.png` and `artifacts/readable-mobile.png`. They use synthetic foods and the labeled sample day.
+
+## SwiftUI replacement — 2026-10-27
+
+The iPhone target now launches a SwiftUI hosting controller directly and no longer links Capacitor or copies website resources. Both simulator and signed arm64 device builds succeeded. The signed app was installed on the paired iPhone. Inspection of the built app found no HTML files.
+
+A native URLSession request to the private hosted assistant returned HTTP 200 with a reply. A second launch, without supplying a credential, also returned HTTP 200, verifying Keychain persistence. Temporary verification code was removed from the final build. The OpenRouter key remains server-side.
+
+In the simulator, the native chat sent a synthetic 150 g chicken description and received preparation questions from the live assistant. Native Today and Chat retain the same system tab bar position with the keyboard dismissed. Screens use native lists/forms and hide scroll indicators. Trends now shows average daily amounts against targets and gaps rather than ranking nutrients from one recorded day.
+
+The prior Capacitor, unsigned-build and account-signing limitations above describe the earlier implementation and are superseded by this SwiftUI build. Physical barcode recognition and spoken dictation remain hardware checks; successful compilation does not prove recognition quality.
+
+Final native acceptance: the simulator follow-up selected roasted, skinless meat. The native review sheet showed USDA SR Legacy, 1.5 × 100 g, and 248 rounded kcal. Confirmation added the entry and updated native Trends. The software keyboard displayed beneath the composer, while the system tab bar stayed out of the composition area. Final clean builds passed for both simulator and signed device. Bundle inspection found zero HTML, JavaScript or CSS assets and zero Capacitor frameworks. All 29 server/web regression tests and the web production build passed.
