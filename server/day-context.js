@@ -125,3 +125,35 @@ export function evaluateChoices(choices, records, summary) {
     };
   });
 }
+
+const displayNumber = (n) =>
+  new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: n < 10 ? 1 : 0,
+  }).format(n);
+const plain = (s) =>
+  String(s)
+    .slice(0, 180)
+    .replace(/[\r\n]/g, " ")
+    .replace(/[\\`*_\[\]<>]/g, "\\$&");
+export function formatFoodChoices(choices, summary) {
+  const rows = choices.map((c) => {
+    const helpful = c.nutrients
+      .filter((n) => n.contribution > 0 && n.remainingBefore > 0)
+      .sort((a, b) => {
+        const macroA = nutrients.find((n) => n.id === a.id)?.group === "Macros",
+          macroB = nutrients.find((n) => n.id === b.id)?.group === "Macros";
+        return (
+          Number(macroA) - Number(macroB) ||
+          Math.min(1, b.contribution / b.remainingBefore) -
+            Math.min(1, a.contribution / a.remainingBefore)
+        );
+      })
+      .slice(0, 3);
+    const amounts = helpful.map((n) => {
+      const name = nutrients.find((x) => x.id === n.id).name;
+      return `${plain(name)}: ${displayNumber(n.contribution)} ${n.unit} (${n.remainingAfter === 0 ? "recorded gap covered" : displayNumber(n.remainingAfter) + " " + n.unit + " still left"}${n.partial ? "; partial data" : ""})`;
+    });
+    return `- **${plain(c.name)} — ${displayNumber(c.quantity)} × ${plain(c.serving)}**, ${displayNumber(c.calories)} kcal\n  ${amounts.length ? amounts.join("; ") : "No quantified contribution to the reported gaps."}${c.caloriesRemainingAfter < 0 ? " This portion exceeds remaining calories by " + displayNumber(-c.caloriesRemainingAfter) + " kcal." : ""}`;
+  });
+  return `For ${summary.date}, you have ${displayNumber(summary.calories.remaining)} recorded kcal left. These are separate food options:\n\n${rows.join("\n\n")}`;
+}

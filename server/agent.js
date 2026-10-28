@@ -1,4 +1,8 @@
-import { summarizeDay, evaluateChoices } from "./day-context.js";
+import {
+  summarizeDay,
+  evaluateChoices,
+  formatFoodChoices,
+} from "./day-context.js";
 import { nutrients } from "../app/data.js";
 import { searchDatabase } from "../app/food-database.js";
 import { lookupBarcode } from "../app/open-food-facts.js";
@@ -294,7 +298,8 @@ export async function runAgent({
     trace = [];
   let searched = false,
     webEnabled = false,
-    proposal = null;
+    proposal = null,
+    adviceChoices = null;
   for (let step = 0; step < 7; step++) {
     const available = [
       ...tools,
@@ -388,8 +393,9 @@ export async function runAgent({
         const args = JSON.parse(call.function.arguments);
         switch (call.function.name) {
           case "evaluate_food_choices": {
+            adviceChoices = evaluateChoices(args.choices, records, selectedDay);
             output = {
-              choices: evaluateChoices(args.choices, records, selectedDay),
+              choices: adviceChoices,
               note: "Each choice is compared individually, not cumulatively. No diary entry was created.",
             };
             trace.push({
@@ -454,6 +460,10 @@ export async function runAgent({
             break;
           }
           case "propose_meal": {
+            if (adviceChoices)
+              throw Error(
+                "Food ideas are advice only. Do not create a meal proposal for a suggestion request.",
+              );
             if (!searched) throw Error("Search nutrition databases first.");
             proposal = validateProposal(args.components, records, citations);
             output = {
@@ -475,6 +485,14 @@ export async function runAgent({
         content: JSON.stringify(output),
       });
     }
+    if (adviceChoices)
+      return {
+        reply: formatFoodChoices(adviceChoices, selectedDay),
+        proposal: null,
+        trace,
+        model,
+        sources: [...citations],
+      };
     if (proposal)
       return {
         reply:

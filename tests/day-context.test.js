@@ -120,3 +120,51 @@ test("default Flash requests pin the exact priced provider with no silent fallba
     },
   });
 });
+test("suggestion output stops after calculated comparison and cannot invent a combined target claim", async () => {
+  const food = {
+    ...foods[0],
+    values: { ...foods[0].values, vitC: 30, fiber: 10 },
+  };
+  let requests = 0;
+  const tool = (name, args) => ({
+    id: String(requests),
+    type: "function",
+    function: { name, arguments: JSON.stringify(args) },
+  });
+  const result = await runAgent({
+    messages: [
+      { role: "user", content: "Which foods help with remaining targets?" },
+    ],
+    dayContext,
+    database: [food],
+    apiKey: "test-only",
+    fetchImpl: async () => {
+      requests++;
+      assert.ok(
+        requests <= 2,
+        "Unnecessary freeform model response after arithmetic",
+      );
+      return Response.json({
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              tool_calls: [
+                requests === 1
+                  ? tool("search_food_database", { query: food.name })
+                  : tool("evaluate_food_choices", {
+                      choices: [{ foodId: food.id, quantity: 0.5 }],
+                    }),
+              ],
+            },
+          },
+        ],
+      });
+    },
+  });
+  assert.equal(requests, 2);
+  assert.equal(result.proposal, null);
+  assert.match(result.reply, /15 mg/);
+  assert.match(result.reply, /35 mg still left/);
+  assert.doesNotMatch(result.reply, /combined|log this/i);
+});
