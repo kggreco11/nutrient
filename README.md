@@ -91,3 +91,11 @@ The initial **Sample day** and 16 illustrative foods are explicitly labeled. Sta
 USDA FoodData Central data is public domain/CC0. Source: [USDA downloads](https://fdc.nal.usda.gov/download-datasets/). Barcode data comes from [Open Food Facts](https://world.openfoodfacts.org), under [ODbL](https://opendatacommons.org/licenses/odbl/1-0/); preserve attribution and comply with applicable database terms when redistributing derived product data. Web nutrition records retain their original source URLs.
 
 This project is independent and not affiliated with Cronometer or any restaurant or nutrition-data provider.
+
+## Reference targets and recorded shortfalls
+
+Tracked micronutrient defaults now use U.S./Canadian male age 19–30 RDA/AI values, with fiber at 38 g. Source links are shown in Settings. These intake references do not represent deficiency treatment, blood levels, or supplement doses. Macros/energy remain separately editable; the combined omega-3 field remains a user-editable tracking target, not a distinct ALA/EPA/DHA recommendation.
+
+On first load, legacy default values migrate once; values differing from the old defaults are preserved. A previously customized value identical to an old default cannot be distinguished from an untouched default. Imported legacy backups use the same migration. Historical entries are unchanged; charts compare them against current targets.
+
+Pattern summaries describe recorded intake and report complete versus reported days, plus entirely unknown days. Days without any reported value for a nutrient are excluded from that nutrient's averages. Partial records can understate intake. The app does not diagnose deficiencies or recommend supplements.

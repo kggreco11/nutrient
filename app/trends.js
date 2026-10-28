@@ -100,6 +100,16 @@ export function nutrientPatterns(state, catalog, endDate, months = 6) {
       return {
         ...n,
         knownDays: known.length,
+        completeDays: known.filter((entries) =>
+          entries.every((e) => {
+            const food = catalog.find((f) => f.id === e.foodId);
+            return (
+              food?.values[n.id] != null &&
+              !food.partialNutrients?.includes(n.id)
+            );
+          }),
+        ).length,
+        unreportedDays: days.length - known.length,
         average: ratios.length
           ? ratios.reduce((a, b) => a + b, 0) / ratios.length
           : null,

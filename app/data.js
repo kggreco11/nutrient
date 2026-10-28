@@ -1,3 +1,4 @@
+import { referenceTargets } from "./targets.js";
 // Illustrative food composition per listed serving. Not a verified food database.
 // Null means unknown; 0 means the sample explicitly records no contribution.
 export const nutrients = [
@@ -542,9 +543,13 @@ export const foods = [
   }),
 ];
 export const meals = ["Breakfast", "Lunch", "Dinner", "Snacks", "Supplements"];
-export const defaultTargets = Object.fromEntries(
-  nutrients.map((n) => [n.id, n.target]),
-);
+for (const n of nutrients) {
+  if (referenceTargets[n.id] !== undefined) n.target = referenceTargets[n.id];
+}
+export const defaultTargets = {
+  ...Object.fromEntries(nutrients.map((n) => [n.id, n.target])),
+  ...referenceTargets,
+};
 export function localDate(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
