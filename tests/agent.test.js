@@ -246,3 +246,35 @@ test("nullable estimate metadata on an exact match does not cause a tool retry o
   assert.equal(result[0].food.id, food.id);
   assert.equal(result[0].food, food);
 });
+
+test("price-filtered endpoint errors explain the cap without suggesting retries or exposing upstream text", async () => {
+  await assert.rejects(
+    runAgent({
+      messages: [{ role: "user", content: "I ate an apple" }],
+      database: foods,
+      apiKey: "test-only",
+      fetchImpl: async () => Response.json({ error: { message: "No endpoints found that satisfy the max price for this request. secret-debug-value" } }, { status: 404 }),
+    }),
+    (error) => {
+      assert.match(error.message, /price cap/i);
+      assert.doesNotMatch(error.message, /try again|secret-debug-value/i);
+      return true;
+    },
+  );
+});
+
+test("endpoint outages do not claim that the price cap was exceeded", async () => {
+  await assert.rejects(
+    runAgent({
+      messages: [{ role: "user", content: "I ate an apple" }],
+      database: foods,
+      apiKey: "test-only",
+      fetchImpl: async () => Response.json({ error: { message: "No endpoints found for this model" } }, { status: 404 }),
+    }),
+    (error) => {
+      assert.match(error.message, /unavailable/i);
+      assert.doesNotMatch(error.message, /price/i);
+      return true;
+    },
+  );
+});

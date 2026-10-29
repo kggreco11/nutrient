@@ -347,7 +347,11 @@ export async function runAgent({
         signal: AbortSignal.timeout(60000),
       },
     );
-    if (!response.ok)
+    if (!response.ok) {
+      // Read only to classify the failure; never forward upstream diagnostic text.
+      const failure = await response.json().catch(() => null);
+      const priceBlocked = response.status === 404 &&
+        /max(?:imum)? price/i.test(failure?.error?.message || "");
       throw Object.assign(
         Error(
           response.status === 401
@@ -355,13 +359,16 @@ export async function runAgent({
             : response.status === 402
               ? "OpenRouter needs available credits."
               : response.status === 404 && model === DEFAULT_MODEL
-                ? "The selected OpenInference endpoint is unavailable at the configured price. Try again shortly."
+                ? priceBlocked
+                  ? "Chat is blocked by the configured price cap for OpenInference. The provider's current price exceeds that limit."
+                  : "The selected OpenInference endpoint is currently unavailable. Try again shortly."
                 : response.status === 429
                   ? "OpenRouter is busy or rate limited. Try again shortly."
                   : "The model service could not complete this request.",
         ),
         { status: 502 },
       );
+    }
     const data = await response.json(),
       message = data.choices?.[0]?.message;
     if (!message) throw Error("The model returned no message.");
