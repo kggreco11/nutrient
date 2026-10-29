@@ -95,7 +95,7 @@ test("reported gaps, partial lower bounds and unknown nutrients are different st
     /Invalid/,
   );
 });
-test("default Flash requests pin the exact priced provider with no silent fallback", async () => {
+test("default Flash requests keep the selected model and provider without a fixed price cap", async () => {
   await runAgent({
     messages: [{ role: "user", content: "I had a burrito" }],
     database: foods,
@@ -106,10 +106,7 @@ test("default Flash requests pin the exact priced provider with no silent fallba
       assert.deepEqual(request.provider.only, ["open-inference"]);
       assert.deepEqual(request.provider.quantizations, ["fp4"]);
       assert.equal(request.provider.allow_fallbacks, false);
-      assert.deepEqual(request.provider.max_price, {
-        prompt: 0.00437,
-        completion: 1.37,
-      });
+      assert.equal(Object.hasOwn(request.provider, "max_price"), false);
       return Response.json({
         choices: [
           {

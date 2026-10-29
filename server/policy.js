@@ -4,7 +4,6 @@ export const PINNED_PROVIDER = {
   only: ["open-inference"],
   quantizations: ["fp4"],
   allow_fallbacks: false,
-  max_price: { prompt: 0.00437, completion: 1.37 },
 };
 export const SYSTEM_PROMPT = `You are Nutrient's food logging assistant. Help the user log foods and, when asked, choose foods to address the selected day's nutrient gaps. Never run ongoing analysis.
 ON-DEMAND FOOD IDEAS:
