@@ -46,11 +46,11 @@ final class NativeBackend {
   private func failure(_ message: String) -> NSError {
     NSError(domain: "Nutrient", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
   }
-  func request(_ payload: [String: Any]) async throws -> Data {
+  func request(_ payload: [String: Any], path: String = "/api/chat") async throws -> Data {
     guard let token else {
       throw failure("Chat isn't connected on this iPhone. Open Settings → Chat connection.")
     }
-    var request = URLRequest(url: URL(string: origin + "/api/chat")!)
+    var request = URLRequest(url: URL(string: origin + path)!)
     request.httpMethod = "POST"
     request.timeoutInterval = 180
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")

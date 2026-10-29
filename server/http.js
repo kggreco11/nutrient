@@ -1,3 +1,4 @@
+import { readLabel } from "./label.js";
 import { runAgent } from "./agent.js";
 import { DEFAULT_MODEL, PINNED_PROVIDER } from "./policy.js";
 const json = (data, status = 200, headers = {}) =>
@@ -42,7 +43,7 @@ export async function handleApi(
       200,
       cors,
     );
-  if (url.pathname !== "/api/chat" || request.method !== "POST")
+  if (!["/api/chat", "/api/label"].includes(url.pathname) || request.method !== "POST")
     return json({ error: "Not found." }, 404, cors);
   // Private Sites supply authenticated identity. Native deployments can use a separate
   // app access token; the OpenRouter provider key is never sent to the client.
@@ -70,6 +71,9 @@ export async function handleApi(
     if (body.length > 250000)
       return json({ error: "Request too large." }, 413, cors);
     const input = JSON.parse(body);
+    if (url.pathname === "/api/label") {
+      return json(await readLabel({ text: input.text, apiKey: env.OPENROUTER_API_KEY, model: env.OPENROUTER_MODEL || DEFAULT_MODEL }), 200, cors);
+    }
     const result = await runAgent({
       messages: input.messages,
       savedFoods: input.savedFoods,

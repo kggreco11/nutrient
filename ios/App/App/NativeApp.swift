@@ -1,3 +1,5 @@
+import AVFoundation
+import PhotosUI
 import Charts
 import SwiftUI
 import UniformTypeIdentifiers
@@ -647,6 +649,7 @@ struct NativeFoodSearch: View {
   @State private var query = ""
   @State private var chosen: NativeFood?
   @State private var scan = false
+  @State private var label = false
   var body: some View {
     NavigationStack {
       List {
@@ -669,16 +672,17 @@ struct NativeFoodSearch: View {
         .toolbar {
           ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
           ToolbarItem(placement: .topBarTrailing) {
-            Button {
-              scan = true
-            } label: {
-              Image(systemName: "barcode.viewfinder")
-            }.accessibilityLabel("Scan barcode")
+            Menu {
+              Button("Scan barcode", systemImage: "barcode.viewfinder") { scan = true }
+              Button("Scan nutrition label", systemImage: "camera.viewfinder") { label = true }
+            } label: { Image(systemName: "camera.viewfinder") }
+            .accessibilityLabel("Scan food")
           }
         }
         .sheet(item: $chosen) { food in NativeMealReview(items: [MealItem(food: food, quantity: 1)])
         }
         .sheet(isPresented: $scan) { NativeScanSheet() }
+        .sheet(isPresented: $label) { NativeCustomFood(supplement: false, scanOnOpen: true) }
     }
   }
 }
@@ -849,6 +853,7 @@ struct NativeLibrary: View {
   @State private var query = ""
   @State private var filter = "All"
   @State private var custom = false
+  @State private var label = false
   @State private var supplement = false
   @State private var build = false
   @State private var chosen: NativeFood?
@@ -883,6 +888,7 @@ struct NativeLibrary: View {
       .toolbar {
         ToolbarItem(placement: .topBarTrailing) {
           Menu {
+            Button("Scan nutrition label", systemImage: "camera.viewfinder") { label = true }
             Button("Custom food") {
               supplement = false
               custom = true
@@ -898,6 +904,7 @@ struct NativeLibrary: View {
         }
       }
       .sheet(isPresented: $custom) { NativeCustomFood(supplement: supplement) }
+      .sheet(isPresented: $label) { NativeCustomFood(supplement: false, scanOnOpen: true) }
       .sheet(item: $editing) { food in
         NativeCustomFood(supplement: food.isSupplement, existing: food)
       }
@@ -910,15 +917,42 @@ struct NativeCustomFood: View {
   @Environment(\.dismiss) var dismiss
   var supplement: Bool
   var existing: NativeFood? = nil
+  var scanOnOpen = false
   @State private var name = ""
   @State private var serving = "1 serving"
   @State private var calories = ""
   @State private var values: [String: String] = [:]
   @State private var source = ""
+  @StateObject private var labelReader = NativeLabelReader()
+  @State private var labelCamera = false
+  @State private var labelPhoto: PhotosPickerItem?
+  @State private var cameraError: String?
+  @State private var scanned = false
+  @State private var initialized = false
   var body: some View {
     NavigationStack {
       Form {
         Section {
+          Button {
+            openLabelCamera()
+          } label: {
+            Label("Scan nutrition label", systemImage: "camera.viewfinder")
+          }.disabled(labelReader.busy)
+          PhotosPicker(selection: $labelPhoto, matching: .images) {
+            Label("Choose label photo", systemImage: "photo")
+          }.disabled(labelReader.busy)
+          if labelReader.busy {
+            HStack { ProgressView(); Text(labelReader.stage) }
+          }
+          if let error = labelReader.error {
+            Text(error).foregroundStyle(.red)
+            if !labelReader.recognizedText.isEmpty {
+              Button("Try again") { labelReader.retry() }
+            }
+          }
+          if scanned { Label("Label ready to review", systemImage: "checkmark.circle") }
+        }
+        Section("Per serving") {
           TextField("Name", text: $name)
           TextField("Serving", text: $serving)
           TextField("Calories", text: $calories).keyboardType(.decimalPad)
@@ -939,6 +973,9 @@ struct NativeCustomFood: View {
           }
         }
       }.onAppear {
+        guard !initialized else { return }
+        initialized = true
+        if scanOnOpen { openLabelCamera() }
         if let existing {
           name = existing.name
           serving = existing.serving
@@ -946,14 +983,46 @@ struct NativeCustomFood: View {
           source = existing.sourceUrl ?? ""
           for n in store.nutrients { values[n.id] = existing.value(n.id).map { String($0) } ?? "" }
         }
-      }.navigationTitle(
+      }
+      .fullScreenCover(isPresented: $labelCamera) {
+        NativeLabelCamera(captured: { image in
+          labelCamera = false
+          labelReader.read(image)
+        }, cancelled: { labelCamera = false }).ignoresSafeArea()
+      }
+      .alert("Camera", isPresented: Binding(get: { cameraError != nil }, set: { if !$0 { cameraError = nil } })) {
+        Button("OK") { cameraError = nil }
+      } message: { Text(cameraError ?? "") }
+      .onChange(of: labelPhoto) { _, photo in
+        guard let photo else { return }
+        Task {
+          do {
+            guard let data = try await photo.loadTransferable(type: Data.self), let image = UIImage(data: data) else {
+              labelReader.error = "Couldn’t open this photo. Choose another."
+              return
+            }
+            labelReader.read(image)
+          } catch { labelReader.error = error.localizedDescription }
+          labelPhoto = nil
+        }
+      }
+      .onReceive(labelReader.$draft) { draft in
+        guard let draft else { return }
+        if !draft.name.isEmpty { name = draft.name }
+        serving = draft.serving
+        calories = draft.calories.map { String($0) } ?? ""
+        values = draft.values.mapValues { $0.map { String($0) } ?? "" }
+        scanned = true
+      }
+      .onDisappear { labelReader.cancel() }
+      .navigationTitle(
         existing != nil ? "Edit label" : supplement ? "New supplement" : "Custom food"
       ).navigationBarTitleDisplayMode(.inline)
         .toolbar {
           ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
           ToolbarItem(placement: .confirmationAction) {
             Button("Save") { save() }.disabled(
-              name.trimmingCharacters(in: .whitespaces).isEmpty || serving.isEmpty
+              labelReader.busy || name.trimmingCharacters(in: .whitespaces).isEmpty || serving.trimmingCharacters(in: .whitespaces).isEmpty
                 || Double(calories) == nil || (Double(calories) ?? -1) < 0
                 || values.values.contains {
                   !$0.isEmpty && (Double($0) == nil || (Double($0) ?? -1) < 0)
@@ -962,13 +1031,25 @@ struct NativeCustomFood: View {
         }
     }
   }
+  private func openLabelCamera() {
+    Task {
+      guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+        cameraError = "Camera isn’t available. Choose a label photo instead."
+        return
+      }
+      let granted = await AVCaptureDevice.requestAccess(for: .video)
+      if granted { labelCamera = true }
+      else { cameraError = "Allow camera access in iPhone Settings, or choose a label photo." }
+    }
+  }
   private func save() {
     var nutrients: [String: Double?] = [:]
     for n in store.nutrients { nutrients[n.id] = .some(Double(values[n.id] ?? "")) }
     let f = NativeFood(
       id: "custom-" + UUID().uuidString, name: name, serving: serving,
       calories: Double(calories) ?? 0, values: nutrients, kind: supplement ? "supplement" : "food",
-      source: "Custom label", sourceUrl: source.isEmpty ? nil : source)
+      source: scanned ? "Scanned nutrition label" : "Custom label", sourceUrl: source.isEmpty ? nil : source,
+      evidence: scanned ? labelReader.recognizedText : nil)
     if let existing { store.archive(existing) }
     store.state.customFoods.append(f)
     store.save()

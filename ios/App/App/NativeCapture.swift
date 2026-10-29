@@ -1,5 +1,6 @@
 import AVFoundation
 import Speech
+import Vision
 import SwiftUI
 
 @MainActor final class NativeDictation: ObservableObject {
@@ -148,5 +149,103 @@ final class ScannerController: UIViewController, AVCaptureMetadataOutputObjectsD
     completed = true
     stop()
     scanned?(code)
+  }
+}
+
+// Capture stays native. Vision reads the photograph on-device; only recognized
+// label text is sent to the same private service used by chat.
+struct NativeLabelCamera: UIViewControllerRepresentable {
+  var captured: (UIImage) -> Void
+  var cancelled: () -> Void
+  func makeCoordinator() -> Coordinator { Coordinator(self) }
+  func makeUIViewController(context: Context) -> UIImagePickerController {
+    let picker = UIImagePickerController()
+    picker.sourceType = .camera
+    picker.cameraCaptureMode = .photo
+    picker.delegate = context.coordinator
+    return picker
+  }
+  func updateUIViewController(_ controller: UIImagePickerController, context: Context) {}
+  final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+    let parent: NativeLabelCamera
+    init(_ parent: NativeLabelCamera) { self.parent = parent }
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { parent.cancelled() }
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+      if let image = info[.originalImage] as? UIImage { parent.captured(image) }
+      else { parent.cancelled() }
+    }
+  }
+}
+
+struct NativeLabelDraft: Decodable {
+  let name: String
+  let serving: String
+  let calories: Double?
+  let values: [String: Double?]
+}
+struct NativeLabelResponse: Decodable { let label: NativeLabelDraft }
+
+@MainActor final class NativeLabelReader: ObservableObject {
+  @Published var busy = false
+  @Published var stage = ""
+  @Published var error: String?
+  @Published var draft: NativeLabelDraft?
+  private(set) var recognizedText = ""
+  private var work: Task<Void, Never>?
+  func cancel() { work?.cancel(); busy = false }
+  func read(_ image: UIImage) {
+    work?.cancel()
+    busy = true
+    error = nil
+    stage = "Reading label…"
+    // Normalize camera rotation before handing the pixels to Vision.
+    let size = image.size
+    let scale = min(1, 2400 / max(size.width, size.height))
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    let normalized = UIGraphicsImageRenderer(size: CGSize(width: size.width * scale, height: size.height * scale), format: format).image { _ in
+      image.draw(in: CGRect(origin: .zero, size: CGSize(width: size.width * scale, height: size.height * scale)))
+    }
+    guard let data = normalized.jpegData(compressionQuality: 0.9) else {
+      busy = false; error = "Couldn’t read this photo. Try another."; return
+    }
+    work = Task {
+      do {
+        let text = try await Task.detached(priority: .userInitiated) {
+          try Self.recognize(data)
+        }.value
+        try Task.checkCancellation()
+        recognizedText = text
+        try await convert(text)
+      } catch is CancellationError { }
+      catch { self.error = error.localizedDescription }
+      if !Task.isCancelled { busy = false }
+    }
+  }
+  func retry() {
+    guard !busy, !recognizedText.isEmpty else { return }
+    busy = true; error = nil
+    work = Task {
+      do { try await convert(recognizedText) }
+      catch is CancellationError { }
+      catch { self.error = error.localizedDescription }
+      if !Task.isCancelled { busy = false }
+    }
+  }
+  nonisolated static func recognize(_ data: Data) throws -> String {
+    let request = VNRecognizeTextRequest()
+    request.recognitionLevel = .accurate
+    request.usesLanguageCorrection = false
+    try VNImageRequestHandler(data: data).perform([request])
+    return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+  }
+  private func convert(_ text: String) async throws {
+    guard text.trimmingCharacters(in: .whitespacesAndNewlines).count >= 10 else {
+      throw NSError(domain: "Nutrient", code: 1, userInfo: [NSLocalizedDescriptionKey: "No readable label found. Get closer and photograph the full Nutrition Facts panel."])
+    }
+    stage = "Filling nutrition facts…"
+    let data = try await NativeBackend().request(["text": text], path: "/api/label")
+    try Task.checkCancellation()
+    draft = try JSONDecoder().decode(NativeLabelResponse.self, from: data).label
   }
 }

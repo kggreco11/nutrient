@@ -4,6 +4,17 @@ import UIKit
 
 @main struct NativeModelChecks {
   @MainActor static func main() throws {
+    let labelText = "Nutrition Facts\nServing size 1 cup (240 mL)\nCalories 120\nTotal Fat 5g\nSodium 110mg\nTotal Carbohydrate 12g\nProtein 8g\nVitamin D 2.5mcg\nCalcium 300mg"
+    let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1100, height: 1000))
+    let labelImage = renderer.image { context in
+      UIColor.white.setFill()
+      context.fill(CGRect(x: 0, y: 0, width: 1100, height: 1000))
+      (labelText as NSString).draw(in: CGRect(x: 40, y: 40, width: 1000, height: 900), withAttributes: [.font: UIFont.systemFont(ofSize: 48), .foregroundColor: UIColor.black])
+    }
+    let recognized = try NativeLabelReader.recognize(labelImage.pngData()!)
+    precondition(recognized.contains("Calories 120") && recognized.contains("Protein 8g") && recognized.contains("300mg"), "Label OCR lost nutrition amounts: \(recognized)")
+    try recognized.write(toFile: "/tmp/nutrient-label-ocr-fixture.txt", atomically: true, encoding: .utf8)
+    print("Native Vision label OCR passed")
     let seedURL = URL(fileURLWithPath: CommandLine.arguments[1])
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
