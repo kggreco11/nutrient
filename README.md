@@ -1,130 +1,136 @@
 # Nutrient
 
-An independent nutrition tracker for iOS and the web. Today's nutrient progress is the home screen; a separate Trends tab shows monthly averages, target coverage and recurring gaps. There are no nutrient paywalls or background AI analysis jobs.
+**A native iOS nutrition tracker built around nutrient coverage.**
 
-## Run
+Log food in plain language, scan a barcode or nutrition label, and see which nutrients you have covered—and which still need attention. Nutrient combines a SwiftUI iPhone app, a bundled food database, and an optional AI assistant. Nutrient tracking and historical views have no subscription gate.
 
-Node.js 20.19+ or 22.12+, npm, and Xcode for iOS.
+## Features
+
+- **Today at a glance:** nutrient-coverage and calorie rings, plus protein, carbohydrate, and fat progress bars.
+- **34 tracked nutrients:** macros, vitamins, minerals, fiber, choline, and omega-3, with editable targets. Tap a nutrient to see how much each logged food contributed.
+- **Visible daily gaps:** surface unmet reported targets and ask the assistant for foods that could help close them.
+- **Conversational logging:** describe or dictate a meal, review the proposed foods and portions, then confirm to log it.
+- **Barcode scanning:** native camera lookup of packaged foods through Open Food Facts.
+- **Nutrition-label photos:** photograph a Nutrition Facts panel or choose an existing photo to prefill a custom food. Review the extracted serving, calories, and nutrient amounts before saving.
+- **Measurement conversion:** enter grams, ounces, pounds, kilograms, or available food-specific measures such as cups, tablespoons, slices, and pieces. See the gram equivalent while calories and nutrients update.
+- **Reusable library:** save custom foods, meals, and supplements. Edit diary entries and portions; archive library items while keeping historical entries intact.
+- **Longer views:** monthly nutrient and calorie averages, target comparisons, and recorded shortfall patterns.
+- **Local storage:** diary, targets, and library persist on the device, with JSON export/import.
+
+The iPhone interface is written in **SwiftUI**, using native navigation, tabs, forms, camera capture, and charts. A separate Vite web companion shares nutrition data and server modules. Web assets are not embedded in the iOS app.
+
+## Run the iOS app
+
+You need macOS, Xcode with an iOS SDK, and an Apple signing team to run on a physical iPhone. The minimum deployment target is **iOS 17**. Node.js 20.19+ or 22.12+ and npm are used for the shared data/build tooling.
 
 ```sh
-npm install
-npm run dev
-```
-
-The browser preview runs at the URL Vite prints. The dev server includes the server-only assistant endpoint.
-
-```sh
-npm test
-npm run build
-npm run ios:sync
+git clone https://github.com/kggreco11/nutrient.git
+cd nutrient
+npm ci
 npm run ios:open
 ```
 
-The iPhone app is written in **SwiftUI**, with a native `TabView`, `NavigationStack`, forms, lists and Swift Charts. `SceneDelegate.swift` hosts `NutrientAppView` directly. It does not load a web view, HTML, CSS, JavaScript or Capacitor runtime. Minimum deployment target: iOS 17. Bundle ID: `com.kggreco11.nutrient`.
+In Xcode:
 
-`npm run ios:sync` refreshes the bundled USDA dataset and reference targets from the shared data sources. Open `ios/App/App.xcodeproj` in Xcode to build and run. The native interface lives in `NativeApp.swift`; persistence/calculations in `NativeModels.swift`; networking and Keychain access in `NativeBackend.swift`; camera and dictation in `NativeCapture.swift`.
+1. Select the **App** target in `ios/App/App.xcodeproj`.
+2. Set your signing team and a bundle identifier you control under **Signing & Capabilities**.
+3. Select an iPhone simulator or connected iPhone and run.
 
-The web companion is a separate Vite application. `npm run build` produces `dist/client` for the website and `dist/server/index.js` for the hosted assistant backend. Those website assets are not included in the iPhone bundle. Legacy Capacitor files remain for migration reference and web utilities, but the Xcode app target has no Capacitor dependency or web resources.
+The bundled food data is already checked in. After changing shared food data or target definitions, refresh the native resources with:
 
-## Conversational logging
+```sh
+npm run ios:sync
+```
 
-Conversation understanding belongs to the **LLM**, not a handwritten food parser. The server defaults to OpenRouter's `deepseek/deepseek-v4.1-flash`, configurable through `OPENROUTER_MODEL`.
+Manual logging, nutrient views, and trends work without an AI key. Chat and label conversion require a configured backend; barcode lookup requires internet access.
 
-1. The user describes foods, restaurant components, supplements and portions in chat or dictates a transcript.
-2. The model searches saved foods and USDA records through `search_food_database`. Packaged products can use `lookup_barcode`.
-3. The assistant asks about unclear food identity, preparation, components or amounts.
-4. After a database lookup proves insufficient, `request_web_fallback` enables OpenRouter web search and page/PDF fetching. The system prompt requires official manufacturer/restaurant sources, source citations and explicit serving bases. No restaurant has a special hardcoded flow.
-5. `propose_meal` returns food records and serving multipliers. Database IDs must have appeared in tool results. Sourced nutrition must cite a returned URL and supply explicit values or nulls.
-6. The app independently totals the proposal, displays its sources and missing data, and **waits for Confirm & log meal**. No model tool can write a diary entry.
+### Backend configuration
 
-The single source of assistant instructions is [`server/policy.js`](server/policy.js); orchestration and tool validation are in [`server/agent.js`](server/agent.js). The model cannot invoke arbitrary application actions. Retrieved content is treated as evidence, not instructions. Search is enabled after database lookup, with bounded model/tool rounds and output tokens. See [`docs/assistant.md`](docs/assistant.md) for the contract and limits.
+The native app currently points to this project's private hosted backend. Forks should deploy their own backend and update `origin` in [`NativeBackend.swift`](ios/App/App/NativeBackend.swift).
 
-### OpenRouter setup
+- Keep `OPENROUTER_API_KEY` on the server.
+- Configure authentication for your deployment. Standalone deployments support a separate `NUTRIENT_API_TOKEN`; the private Sites deployment uses its service-access credential.
+- The app's **More → Settings → Chat connection** stores the service-access credential in iOS Keychain. Use the credential appropriate to your chosen authentication mechanism; it is never the OpenRouter key. Adapt the request authorization header in `NativeBackend.swift` if you use standalone bearer-token authentication instead of Sites.
 
-Copy `.env.example` to ignored `.env.local` and set `OPENROUTER_API_KEY` locally. Do not paste the key into chat, app fields, source code, Vite client variables, or a GitHub commit. Restart the dev server after changing this file. `OPENROUTER_MODEL` defaults to `deepseek/deepseek-v4.1-flash`.
+The checked-in Xcode project contains development signing identifiers, not signing certificates or private keys. Camera and microphone features need the corresponding iOS permissions.
 
-For the hosted Worker, configure these as server runtime values in the hosting service. Local `.env.local` values are not uploaded or automatically deployed. Model tokens and web tools consume OpenRouter credits. The app's nutrient views and manual food logging work without an AI key. Automated server tests mock provider responses; live checks are documented separately.
+## Run the web companion
 
-`GET /api/status` reports whether a provider key is configured, without returning it. `POST /api/chat` runs a user-triggered conversation turn. Private hosted access is enforced by Sites. Standalone/native API deployments can use a separate `NUTRIENT_API_TOKEN`; do not use the OpenRouter key as an app access token. The native app calls the private hosted assistant using URLSession and a service-access credential stored in iOS Keychain. Settings → Chat connection can reconnect the service. Development provisioning may supply `NUTRIENT_SERVICE_TOKEN` as a launch environment variable; it is saved to Keychain and removed from the app's process environment. It is not the OpenRouter key. Neither credential is bundled, committed or included in backups.
+```sh
+npm ci
+cp .env.example .env.local
+npm run dev
+```
 
-## Nutrition data
+Open the local URL Vite prints. For AI features, set `OPENROUTER_API_KEY` in `.env.local` and restart the dev server. The file is ignored by Git. Hosted deployments need their own server runtime secrets; local environment files are not uploaded.
 
-- **USDA FoodData Central, SR Legacy:** 7,793 bundled searchable food records, including 312 historical fast-food records. Downloaded from USDA's official public dataset. It is the final **April 2018 SR release**, published into FoodData Central in 2019, not a current restaurant-menu database. Source IDs and a checksum are recorded. Values are per 100 g. No API key is needed.
-- **Open Food Facts:** native camera UPC/EAN scanning and browser camera scanning look up real packaged products through the supported product API. Manual barcode entry remains a fallback. Community data can be incomplete; verify against the label.
-- **Saved foods and sourced labels:** users can add custom food or supplement labels with source URLs, then reuse them.
-- **Official public nutrition sources:** a configured LLM can find and read manufacturer/restaurant pages when databases lack a suitable match. Its extracted values remain explicitly reviewable and are not treated as independently verified facts.
+```dotenv
+OPENROUTER_API_KEY=your_key_here
+OPENROUTER_MODEL=deepseek/deepseek-v4.1-flash
+```
 
-The app does not claim comprehensive current restaurant coverage. Aggregators such as FatSecret or Nutritionix can be added to the database tool behind the same interface when access is available. Do not scrape arbitrary sites as the default strategy or silently replace branded recipes with generic foods.
+The default model is **DeepSeek V4.1 Flash via OpenRouter**, routed to OpenInference FP4 without a fixed token-price cap. Model selection is configured server-side. Model requests and optional web tools incur provider charges; the app does not include API credits.
 
-Reproduce the bundled database:
+```sh
+npm run build
+```
+
+This builds `dist/client` for the web companion and `dist/server/index.js` for the hosted Worker. The existing hosting manifest belongs to this project's private deployment; replace it when deploying your own instance.
+
+## How food lookup works
+
+1. The model interprets the meal description and searches saved foods and the bundled USDA database first.
+2. Barcode requests use Open Food Facts. If an exact product is missing, the assistant can propose a clearly labeled comparable-food estimate.
+3. When needed, a database lookup can unlock web search and page/PDF retrieval for public manufacturer or restaurant nutrition sources.
+4. The server validates food IDs, portions, and source references. App code calculates nutrition totals.
+5. The app shows a review. **Only your confirmation writes the diary entry.**
+
+The assistant can also answer user-triggered questions about the selected day's gaps. Recommendations do not automatically log food. There are no background AI monitoring or analysis jobs.
+
+Label photos use **Apple Vision OCR on the device**, then send the recognized text to the backend for structured extraction with the selected model. Missing or unreadable nutrients stay unknown; percent Daily Values are not substituted for absolute amounts.
+
+See the [assistant contract](docs/assistant.md), [runtime instructions](server/policy.js), and [label extraction module](server/label.js).
+
+## Nutrition data and calculations
+
+**USDA FoodData Central / SR Legacy** supplies 7,793 bundled food records. Food-specific household measures are available for 7,526 of them. Nutrient values use a 100 g basis; measurement conversions retain the source food's portion weights. Ounces and pounds use exact mass conversions. Volume and item counts need a food-specific weight; the app does not assume every food has water's density. Custom labels can include a serving weight in grams.
+
+The dataset is the final **April 2018 SR Legacy release**, including historical restaurant entries. It is not a live restaurant-menu database. Source details and the archive checksum are in the [data manifest](public/data/usda-manifest.json). Packaged-product lookup uses [Open Food Facts](https://world.openfoodfacts.org/); community records can be incomplete.
+
+Rebuild the USDA data with Python 3:
 
 ```sh
 python3 scripts/import-usda.py
-# Or use a previously downloaded official ZIP:
+# Or use a previously downloaded official archive:
 python3 scripts/import-usda.py /path/to/FoodData_Central_sr_legacy_food_csv_2018-04.zip
+npm run ios:sync
 ```
 
-The importer uses Vitamin A as RAE, folate as DFE and vitamin D in micrograms. Combined omega-3 is reported only when all four explicit ALA/EPA/DHA/DPA values exist. Missing data remains `null`; zero means a reported zero. See `public/data/usda-manifest.json`.
+The overall coverage score averages **31 capped nutrient percentages**; the three macros and calories are displayed separately. Exceeding one target cannot offset another nutrient's shortfall. Unreported amounts remain `null`, distinct from a reported zero. Coverage is a comparison with editable intake targets, not a clinical assessment or an upper-limit safety score.
 
-## Saved meals and supplements
+The checked-in targets and supplement examples reflect this project's initial configuration. Adjust them for your own use in Settings. Background and sources are recorded in the [nutrition research notes](docs/sports-nutrition-targets.md).
 
-Library has foods, reusable composite meals and supplements. Build a meal from database or saved components, specify each serving multiplier, then save it under a name such as a usual breakfast. Saved meals snapshot component sources, portions and nutrient values. A partial nutrient total includes known contributions and is marked incomplete.
+## Development
 
-Supplement labels use the actual nutrient amounts per capsule/tablet/serving, not percent Daily Value. The diary has a separate Supplements section. Today shows food-only coverage alongside combined coverage; historical charts distinguish food from supplement contributions. Logging a supplement is not a dosage recommendation.
+```sh
+npm test                 # JavaScript calculation, data, API, and assistant tests
+npm run test:native      # Swift model, OCR, conversion, persistence, and contrast checks
+npm run build            # Web and hosted backend build
+```
 
-Editing a saved food creates a new version and archives the old one, preserving historical diary values. Archiving removes an item from the active library without destroying existing logs.
+Native checks require Xcode and a booted iOS simulator. The Swift test script currently targets an Apple Silicon simulator.
 
-## Trends
+| Location | Purpose |
+| --- | --- |
+| `ios/App/App/NativeApp.swift` | SwiftUI screens and logging flows |
+| `ios/App/App/NativeModels.swift` | Local persistence, nutrient calculations, and measurement conversion |
+| `ios/App/App/NativeCapture.swift` | Barcode camera, label OCR, and dictation |
+| `ios/App/App/NativeBackend.swift` | Native networking and Keychain access |
+| `server/` | Assistant tools, label extraction, selected-day arithmetic, and API routes |
+| `app/` | Web companion and shared data definitions |
+| `public/data/` | Bundled USDA dataset and provenance |
+| `tests/` | JavaScript tests and native model checks |
 
-Select 3, 6 or 12 months and an overall score, energy or individual nutrient. The chart shows monthly averages and the target line. Empty days and initial sample entries are excluded. Per-nutrient averages exclude days with no reported value for that nutrient. The nutrient grid shows monthly coverage, and an intake summary lists average daily amounts, targets and gaps, sorted by lowest target coverage. One recorded day is not described as a recurring pattern. These are deterministic calculations performed when you open Trends; no model calls, polling jobs, forecasts or ongoing analysis are involved.
+Some unused Capacitor migration files remain in the repository. The active iOS target runs SwiftUI directly and does not link the Capacitor runtime.
 
-Overall score is the mean of 31 capped nutrient-coverage percentages (13 vitamins, 15 minerals, fiber, choline and omega-3), rounded to an integer. Macros and energy are separate. A nutrient above target cannot mask a gap in another. Individual nutrient trends retain percentages above 100 so over-target patterns stay visible. Targets are current, editable examples, not personalized clinical recommendations. Coverage does not assess absorption, health, nutrient interactions or safe upper limits.
-
-## iOS camera, dictation and data
-
-The native scanner uses AVFoundation's camera and barcode recognition. Web preview uses ZXing. Camera frames are processed on-device; decoded digits are sent to Open Food Facts. Native dictation uses Apple's Speech and AVFoundation APIs. A transcript is sent to the assistant only when Send is tapped. Hardware recognition still needs a physical camera/microphone acceptance check.
-
-Native diary data persists as an atomic JSON file in Application Support. Existing Capacitor Preferences data is read on first migration; future saves also retain a compatible preferences copy. Unreadable data is saved separately for recovery. Web data uses localStorage. There is no account synchronization. Export/import JSON transfers diary entries, targets and the saved library; import validates records and asks before replacing data. The private chat credential stays in Keychain.
-
-The initial **Sample day** and 16 illustrative foods are explicitly labeled. Start fresh removes sample entries. Historical patterns exclude sample entries even if you add real food on the sample date.
-
-## Data attribution
-
-USDA FoodData Central data is public domain/CC0. Source: [USDA downloads](https://fdc.nal.usda.gov/download-datasets/). Barcode data comes from [Open Food Facts](https://world.openfoodfacts.org), under [ODbL](https://opendatacommons.org/licenses/odbl/1-0/); preserve attribution and comply with applicable database terms when redistributing derived product data. Web nutrition records retain their original source URLs.
-
-This project is independent and not affiliated with Cronometer or any restaurant or nutrition-data provider.
-
-## Reference targets and recorded shortfalls
-
-Tracked micronutrient defaults now use U.S./Canadian male age 19–30 RDA/AI values, with fiber at 38 g. Source links are shown in Settings. These intake references do not represent deficiency treatment, blood levels, or supplement doses. Macros/energy remain separately editable; the combined omega-3 field remains a user-editable tracking target, not a distinct ALA/EPA/DHA recommendation.
-
-On first load, legacy default values migrate once; values differing from the old defaults are preserved. A previously customized value identical to an old default cannot be distinguished from an untouched default. Imported legacy backups use the same migration. Historical entries are unchanged; charts compare them against current targets.
-
-Intake summaries describe recorded intake and report complete versus reported days, plus entirely unknown days. Days without any reported value for a nutrient are excluded from that nutrient's averages. Partial records can understate intake. The app does not diagnose deficiencies or recommend supplements.
-
-
-## Expanded dashboard and entry editing
-
-The native Today dashboard begins with two rings (nutrient coverage and calories) and three progress bars (protein, carbohydrate and fat), followed by an overview of D, B6, B12, magnesium, choline and chromium; its category picker exposes vitamins, minerals and other nutrients. All 34 fields are available in search, label entry, settings and history. Missing composition values display as unreported rather than zero intake. The score remains a conservative coverage measure: unknown nutrients do not earn coverage.
-
-The expanded catalog adds niacin equivalents (B3), pantothenic acid (B5), biotin, choline, phosphorus, sodium, chloride, copper, iodine, manganese, molybdenum, chromium and fluoride. USDA values are imported only when reported; niacin equivalents may be calculated from measured niacin plus tryptophan (60 mg tryptophan per 1 mg NE), and fluoride is converted from µg to mg. Chromium/iodine/other sparsely reported fields remain null when absent. Existing saved records receive new fields without altering their old measured values or customized targets. Old USDA snapshots can gain newly imported nutrient fields by the same source record ID.
-
-Tap a logged row or its pencil in Today or Diary to edit its servings, meal and date. Saving updates the existing entry ID, recalculates totals, and moves the record when its date changes. It does not append a second copy. Label editing in Library versions the food independently of historical entries.
-
-Native accent colors adapt to light/dark appearance, including a contrasting foreground for filled buttons. `npm run test:native` checks actual Swift entry editing, date moves, persistence, migration and text/button contrast in a booted Apple Silicon simulator.
-
-The assistant explicitly disables reasoning for routine meal resolution and rejects blank provider output as a retryable service error. It never substitutes a generic food question for an empty model response. Live timing is documented in `docs/live-checks.md`; provider response time remains variable.
-
-Evidence-informed target discussion, including B6/B12 and Thorne comparisons, is in [`docs/sports-nutrition-targets.md`](docs/sports-nutrition-targets.md). The user subsequently requested an update: the provisional plan is now 3,500 kcal, 160 g protein, 500 g carbohydrate, 95 g fat, B6 1.8 mg, B12 4 µg and D 25 µg (matching the reported 1,000 IU). Existing customized goals are preserved. Saved D3/K2 and Nordic fish-oil records can be logged individually; there is no automatic daily logging. Other micronutrient targets remain starting references pending discussion.
-
-
-Closest-match meal logging is permitted by default. The assistant prefers the exact product, then may choose a nutritionally comparable retrieved food or component-based recipe. It supplies `estimatedFor` and `matchReason`; the harness creates a distinct `(estimate)` record with source provenance and unchanged source nutrient values. It does not relabel an approximation as verified branded nutrition. Missing nutrients remain unknown, and logging still requires review/confirmation. Exact current-source lookup remains available when requested. This relaxation does not permit invented supplement dosages.
-
-
-## Daily gaps and food ideas
-
-Today surfaces the lowest recorded nutrient coverage with the amount still needed. All known shortfalls can expand inline; unreported nutrients are separate. Diary provides the same coverage for the selected date. Tap any macro bar, nutrient row or gap to see per-food contributions, scaled by logged portions and including supplements. Unknown and explicitly zero contributions remain distinct.
-
-Chat sends a fresh snapshot of the selected day's logged food values and personal targets with each user request. The server validates numeric data and computes remaining amounts. On-demand food suggestions use database searches plus `evaluate_food_choices` to calculate each option against the actual gaps and remaining calories. Suggestions do not create meal proposals or diary entries. There are no automatic coaching runs.
-
-The user selected `deepseek/deepseek-v4.1-flash` through OpenInference's FP4 endpoint: request routing allows only `open-inference`, disables fallbacks, and caps per-million rates at $0.00437 input and $1.37 output. This is a provider-specific quote, distinct from the model catalog's single top-provider pricing object. If that endpoint/price is unavailable, the request fails rather than silently changing provider.
+Issues and pull requests are welcome. Include reproduction steps for bugs, keep unknown nutrition distinct from zero, and keep provider credentials out of client code and commits.
