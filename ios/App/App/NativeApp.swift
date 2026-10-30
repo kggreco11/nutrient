@@ -244,6 +244,20 @@ struct NativeNutrientDetail: View {
             Text("\(number(item.entry.quantity)) × \(item.food.serving) · \(item.entry.meal)").font(
               .subheadline
             ).foregroundStyle(.secondary)
+            if let components = item.food.components, components.contains(where: { $0.values != nil }) {
+              DisclosureGroup("Ingredients") {
+                ForEach(Array(components.enumerated()), id: \.offset) { _, component in
+                  HStack(alignment: .top) {
+                    Text(component.name)
+                    Spacer()
+                    if let value = component.values?[id] ?? nil {
+                      Text("\(number(value * component.quantity * item.entry.quantity)) \(nutrient.unit)")
+                        .monospacedDigit()
+                    } else { Text("Not reported").foregroundStyle(.secondary) }
+                  }.font(.subheadline)
+                }
+              }
+            }
           }.padding(.vertical, 5)
         }
       }
@@ -355,6 +369,12 @@ struct NativeEntryEditor: View {
         if let food = store.food(entry.foodId) {
           Section {
             Text(food.name).font(.headline)
+            if let components = food.components {
+              ForEach(Array(components.enumerated()), id: \.offset) { _, component in
+                Text("\(component.name) · \(number(component.quantity)) × \(component.serving)")
+                  .font(.subheadline).foregroundStyle(.secondary)
+              }
+            }
             NativeQuantityInput(food: food, quantity: $quantity)
             LabeledContent(
               "Energy",
@@ -612,6 +632,10 @@ struct NativeMealReview: View {
   @Environment(\.dismiss) var dismiss
   @State var items: [MealItem]
   var fromChat = false
+  var onLog: (() -> Void)? = nil
+  @State private var scanMore = false
+  @State private var addIngredient = false
+  @State private var groupMeal = true
   @State private var meal = "Breakfast"
   @State private var name = ""
   @State private var saveMeal = false
@@ -632,7 +656,9 @@ struct NativeMealReview: View {
                 Link("Source", destination: link).font(.caption)
               }
             }.padding(.vertical, 4)
-          }
+          }.onDelete { items.remove(atOffsets: $0) }
+          Button("Scan another item", systemImage: "barcode.viewfinder") { scanMore = true }
+          Button("Add from foods", systemImage: "plus") { addIngredient = true }
         }
         Section {
           LabeledContent(
@@ -643,16 +669,24 @@ struct NativeMealReview: View {
           DatePicker("Date", selection: $store.date, displayedComponents: .date)
         }
         Section {
+          if items.filter({ !$0.food.isSupplement }).count > 1 {
+            Toggle("Log as one meal", isOn: $groupMeal)
+          }
+          if (items.count > 1 && groupMeal) || saveMeal {
+            TextField(saveMeal ? "Meal name" : "Meal name (optional)", text: $name)
+          }
           Toggle("Save as a reusable meal", isOn: $saveMeal)
-          if saveMeal { TextField("Meal name", text: $name) }
         }
         Button("Confirm & log meal") {
-          store.log(items, meal: meal, saveAs: saveMeal ? name : "")
+          store.log(items, meal: meal, saveAs: saveMeal ? name : "",
+            groupedAs: groupMeal && items.filter({ !$0.food.isSupplement }).count > 1
+              ? (name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Meal" : name) : nil)
           if fromChat {
             store.state.chatHistory =
               store.history + [NativeMessage(role: "assistant", content: "Logged this meal.")]
             store.save()
           }
+          onLog?()
           dismiss()
         }.disabled(
           items.isEmpty
@@ -660,7 +694,16 @@ struct NativeMealReview: View {
             || (saveMeal && name.trimmingCharacters(in: .whitespaces).isEmpty))
       }.navigationTitle("Review meal").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+        .sheet(isPresented: $scanMore) {
+          NativeScanSheet(selected: { append($0) })
+        }
+        .sheet(isPresented: $addIngredient) {
+          NativeFoodSearch(selected: { append($0) })
+        }
     }
+  }
+  private func append(_ food: NativeFood) {
+    items.append(MealItem(food: food, quantity: 1))
   }
 }
 struct NativeFoodSearch: View {
@@ -671,6 +714,7 @@ struct NativeFoodSearch: View {
   @State private var chosen: NativeFood?
   @State private var scan = false
   @State private var label = false
+  @State private var scannedSelection: NativeFood?
   var body: some View {
     NavigationStack {
       List {
@@ -702,7 +746,19 @@ struct NativeFoodSearch: View {
         }
         .sheet(item: $chosen) { food in NativeMealReview(items: [MealItem(food: food, quantity: 1)])
         }
-        .sheet(isPresented: $scan) { NativeScanSheet() }
+        .sheet(isPresented: $scan, onDismiss: {
+          if let food = scannedSelection {
+            scannedSelection = nil
+            selected?(food)
+            dismiss()
+          }
+        }) {
+          if selected != nil {
+            NativeScanSheet(selected: { scannedSelection = $0 })
+          } else {
+            NativeScanSheet()
+          }
+        }
         .sheet(isPresented: $label) { NativeCustomFood(supplement: false, scanOnOpen: true) }
     }
   }
@@ -725,6 +781,8 @@ struct FoodRow: View {
 struct NativeScanSheet: View {
   @EnvironmentObject var store: NutrientStore
   @Environment(\.dismiss) var dismiss
+  var selected: ((NativeFood) -> Void)? = nil
+  @State private var logged = false
   @State private var code = ""
   @State private var camera = true
   @State private var status: String?
@@ -748,6 +806,9 @@ struct NativeScanSheet: View {
         }
         if loading { ProgressView("Looking up product…") }
         if let status { Text(status).foregroundStyle(.secondary) }
+        if !camera && !loading {
+          Button("Scan barcode", systemImage: "barcode.viewfinder") { code = ""; status = nil; camera = true }
+        }
         HStack {
           TextField("Barcode", text: $code).keyboardType(.numberPad).textFieldStyle(.roundedBorder)
           Button("Look up") { Task { await lookup() } }.disabled(loading || code.isEmpty)
@@ -755,8 +816,8 @@ struct NativeScanSheet: View {
         Spacer(minLength: 0)
       }.padding().navigationTitle("Scan barcode").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
-        .sheet(item: $product) { food in
-          NativeMealReview(items: [MealItem(food: food, quantity: 1)])
+        .sheet(item: $product, onDismiss: { if logged { dismiss() } }) { food in
+          NativeMealReview(items: [MealItem(food: food, quantity: 1)], onLog: { logged = true })
         }
     }
   }
@@ -765,7 +826,11 @@ struct NativeScanSheet: View {
     loading = true
     status = nil
     defer { loading = false }
-    do { product = try await store.backend.barcode(code) } catch {
+    do {
+      let food = try await store.backend.barcode(code)
+      if let selected { selected(food); dismiss() }
+      else { product = food }
+    } catch {
       status = error.localizedDescription
     }
   }

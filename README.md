@@ -10,7 +10,7 @@ Log food in plain language, scan a barcode or nutrition label, and see which nut
 - **34 tracked nutrients:** macros, vitamins, minerals, fiber, choline, and omega-3, with editable targets. Tap a nutrient to see how much each logged food contributed.
 - **Visible daily gaps:** surface unmet reported targets and ask the assistant for foods that could help close them.
 - **Conversational logging:** describe or dictate a meal, review the proposed foods and portions, then confirm to log it.
-- **Barcode scanning:** native camera lookup of packaged foods through Open Food Facts.
+- **Barcode scanning:** native camera lookup of packaged foods through Open Food Facts. Scan successive ingredients into one meal draft, adjust each portion, and log them together as a named meal. Mix scans with database foods and optionally save the meal for reuse.
 - **Nutrition-label photos:** photograph a Nutrition Facts panel or choose an existing photo to prefill a custom food. Review the extracted serving, calories, and nutrient amounts before saving.
 - **Measurement conversion:** enter grams, ounces, pounds, kilograms, or available food-specific measures such as cups, tablespoons, slices, and pieces. See the gram equivalent while calories and nutrients update.
 - **Reusable library:** save custom foods, meals, and supplements. Edit diary entries and portions; archive library items while keeping historical entries intact.

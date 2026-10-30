@@ -124,6 +124,34 @@ import UIKit
       }
       return linear(r) * 0.2126 + linear(g) * 0.7152 + linear(b) * 0.0722
     }
+    let mealStore = NutrientStore(seedURL: seedURL, storageURL: directory.appendingPathComponent("meals.json"), mirrorPreferences: false)
+    mealStore.state.days = [:]
+    let bread = NativeFood(id: "bread-test", name: "Bread", serving: "100 g", calories: 250, values: ["protein": 10, "vitC": nil])
+    let cheese = NativeFood(id: "cheese-test", name: "Cheese", serving: "100 g", calories: 400, values: ["protein": 25, "vitC": 0])
+    let butter = NativeFood(id: "butter-test", name: "Butter", serving: "100 g", calories: 700, values: ["protein": 1, "vitC": nil])
+    let ingredients = [MealItem(food: bread, quantity: 0.6), MealItem(food: cheese, quantity: 0.3), MealItem(food: butter, quantity: 0.1)]
+    mealStore.log(ingredients, meal: "Lunch", groupedAs: "Grilled cheese")
+    precondition(mealStore.day.entries.count == 1, "A combined meal must be one diary entry")
+    let sandwich = mealStore.food(mealStore.day.entries[0].foodId)!
+    precondition(sandwich.name == "Grilled cheese" && sandwich.components?.count == 3)
+    precondition(sandwich.archived == true, "Logging alone must not add a reusable meal to the library")
+    precondition(abs(mealStore.total("calories") - 340) < 0.00001 && abs(mealStore.total("protein") - 13.6) < 0.00001)
+    precondition(sandwich.partialNutrients?.contains("vitC") == true)
+    precondition(sandwich.components?[1].values?["protein"] == 25)
+    precondition(sandwich.servingGrams == 100)
+    let persistedMeal = NutrientStore(seedURL: seedURL, storageURL: directory.appendingPathComponent("meals.json"), mirrorPreferences: false)
+    precondition(persistedMeal.day.entries.count == 1 && persistedMeal.food(sandwich.id)?.components?.count == 3)
+    mealStore.log(ingredients, meal: "Dinner", saveAs: "Usual grilled cheese", groupedAs: "Grilled cheese")
+    precondition(mealStore.day.entries.count == 2)
+    precondition(mealStore.state.customFoods.filter { $0.name == "Usual grilled cheese" && $0.archived != true }.count == 1)
+    var supplement = cheese
+    supplement.id = "supplement-test"; supplement.kind = "supplement"
+    mealStore.log(ingredients + [MealItem(food: supplement, quantity: 1)], meal: "Lunch", groupedAs: "Lunch with supplement")
+    precondition(mealStore.day.entries.count == 4 && mealStore.day.entries.last?.meal == "Supplements")
+    let beforeInvalid = mealStore.day.entries.count
+    mealStore.log([MealItem(food: bread, quantity: .nan), MealItem(food: cheese, quantity: 1)], meal: "Lunch", groupedAs: "Invalid")
+    precondition(mealStore.day.entries.count == beforeInvalid)
+    print("Combined meal logging, quantities, ingredient snapshots, partial data, supplements and persistence passed")
     for style in [UIUserInterfaceStyle.light, .dark] {
       let traits = UITraitCollection(userInterfaceStyle: style)
       traits.performAsCurrent {

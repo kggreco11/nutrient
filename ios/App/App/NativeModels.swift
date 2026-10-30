@@ -14,6 +14,7 @@ struct FoodComponent: Codable {
   let serving: String
   let source: String
   let quantity: Double
+  var values: [String: Double?]? = nil
 }
 struct NativeFood: Codable, Identifiable {
   var id: String
@@ -383,13 +384,22 @@ struct NativeDayContext: Encodable {
   func remember(_ food: NativeFood) {
     if !foods.contains(where: { $0.id == food.id }) { state.customFoods.append(food) }
   }
-  func log(_ items: [MealItem], meal: String, saveAs name: String = "") {
-    if !name.trimmingCharacters(in: .whitespaces).isEmpty {
-      state.customFoods.append(composite(name, items: items.filter { !$0.food.isSupplement }))
+  func log(_ items: [MealItem], meal: String, saveAs name: String = "", groupedAs groupName: String? = nil) {
+    guard !items.isEmpty, items.allSatisfy({ $0.quantity.isFinite && $0.quantity > 0 && $0.quantity <= 100 }) else { return }
+    let ingredients = items.filter { !$0.food.isSupplement }
+    let reusable = !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    var loggedItems = items
+    if let groupName, ingredients.count > 1 {
+      var combined = composite(reusable ? name : groupName, items: ingredients)
+      combined.archived = !reusable
+      combined.source = "Meal"
+      loggedItems = [MealItem(food: combined, quantity: 1)] + items.filter { $0.food.isSupplement }
+    } else if reusable && !ingredients.isEmpty {
+      state.customFoods.append(composite(name, items: ingredients))
     }
     var d = day
-    for item in items {
-      guard item.quantity > 0, item.quantity <= 100 else { continue }
+    for item in loggedItems {
+      guard item.quantity.isFinite, item.quantity > 0, item.quantity <= 100 else { continue }
       remember(item.food)
       d.entries.append(
         DiaryEntry(
@@ -439,8 +449,10 @@ struct NativeDayContext: Encodable {
       components: items.map {
         FoodComponent(
           name: $0.food.name, serving: $0.food.serving, source: $0.food.source ?? "Custom",
-          quantity: $0.quantity)
-      })
+          quantity: $0.quantity, values: $0.food.values)
+      }, energyUnreported: items.contains { $0.food.energyUnreported == true },
+      servingGrams: items.allSatisfy { $0.food.gramsPerServing != nil }
+        ? items.reduce(0) { $0 + ($1.food.gramsPerServing ?? 0) * $1.quantity } : nil)
   }
   func loadDatabase() async {
     guard database.isEmpty else { return }
