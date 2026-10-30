@@ -15,6 +15,15 @@ values={}
 for row in rows('food_nutrient'):
  nid=int(row['nutrient_id'])
  if nid in needed: values.setdefault(row['fdc_id'],{})[nid]=float(row['amount'])
+portions={}
+units={r['id']:r['name'] for r in rows('measure_unit')}
+for r in rows('food_portion'):
+ try: amount=float(r['amount']); grams=float(r['gram_weight'])
+ except ValueError: continue
+ if amount<=0 or grams<=0: continue
+ label=r['modifier'].strip() or r['portion_description'].strip() or units.get(r['measure_unit_id'],'')
+ if not label or label=='undetermined': continue
+ portions.setdefault(r['fdc_id'],[]).append({'id':r['id'],'label':label,'grams':round(grams/amount,6)})
 result=[]
 for f in rows('food'):
  v=values.get(f['fdc_id'],{})
@@ -28,7 +37,7 @@ for f in rows('food'):
  # Report combined omega-3 only when all four explicit n-3 components exist.
  omega=[v.get(i) for i in [1404,1272,1278,1280]]
  n['omega3']=round(sum(omega),6) if all(x is not None for x in omega) else None
- result.append({'id':'usda-'+f['fdc_id'],'name':f['description'],'serving':'100 g','emoji':'◈','calories':v[1008],'values':n,'kind':'food','source':'USDA SR Legacy','sourceId':f['fdc_id'],'restaurant':f['food_category_id']=='21'})
+ result.append({'id':'usda-'+f['fdc_id'],'name':f['description'],'serving':'100 g','emoji':'◈','calories':v[1008],'values':n,'kind':'food','source':'USDA SR Legacy','sourceId':f['fdc_id'],'restaurant':f['food_category_id']=='21','servingGrams':100,'portions':portions.get(f['fdc_id'],[])})
 result.sort(key=lambda f:f['name'].lower())
 out=Path(__file__).resolve().parents[1]/'public/data';out.mkdir(parents=True,exist_ok=True)
 (out/'usda-sr-legacy.json').write_text(json.dumps(result,separators=(',',':')))

@@ -32,8 +32,56 @@ struct NativeFood: Codable, Identifiable {
   var evidence: String?
   var retrievedAt: String?
   var energyUnreported: Bool?
+  var servingGrams: Double?
+  var portions: [NativePortionMeasure]?
   func value(_ id: String) -> Double? { values[id] ?? nil }
   var isSupplement: Bool { kind == "supplement" }
+}
+struct NativePortionMeasure: Codable, Identifiable {
+  let id: String
+  let label: String
+  let grams: Double
+}
+struct NativeAmountUnit: Identifiable {
+  let id: String
+  let label: String
+  let servings: Double
+}
+extension NativeFood {
+  // Mass units are exact. Volume/count measures require a weight from this food.
+  var gramsPerServing: Double? {
+    if let servingGrams, servingGrams.isFinite, servingGrams > 0 { return servingGrams }
+    let pattern = #"(?i)(?<![0-9/.,])([0-9]+(?:\.[0-9]+)?)\s*(kg|kilograms?|g|grams?|oz|ounces?|lb|lbs|pounds?)\b"#
+    guard let expression = try? NSRegularExpression(pattern: pattern),
+      let match = expression.matches(in: serving, range: NSRange(serving.startIndex..., in: serving)).sorted(by: {
+        let a = (serving as NSString).substring(with: $0.range(at: 2)).lowercased()
+        let b = (serving as NSString).substring(with: $1.range(at: 2)).lowercased()
+        return (a == "g" || a.hasPrefix("gram")) && !(b == "g" || b.hasPrefix("gram"))
+      }).first,
+      let numberRange = Range(match.range(at: 1), in: serving),
+      let unitRange = Range(match.range(at: 2), in: serving),
+      let amount = Double(serving[numberRange]), amount > 0 else { return nil }
+    // Do not read the denominator of a fractional or mixed mass as a whole mass.
+    let prefix = String(serving[..<numberRange.lowerBound])
+    if prefix.last == "/" || prefix.last?.isNumber == true { return nil }
+    let unit = serving[unitRange].lowercased()
+    let multiplier = unit.hasPrefix("kg") || unit.hasPrefix("kilogram") ? 1000.0
+      : unit == "oz" || unit.hasPrefix("ounce") ? 28.349523125
+      : unit.hasPrefix("lb") || unit.hasPrefix("pound") ? 453.59237 : 1
+    return amount * multiplier
+  }
+  var amountUnits: [NativeAmountUnit] {
+    let original = NativeAmountUnit(id: "serving", label: "Servings", servings: 1)
+    guard let grams = gramsPerServing else { return [original] }
+    return [
+      NativeAmountUnit(id: "g", label: "Grams", servings: 1 / grams),
+      NativeAmountUnit(id: "oz", label: "Ounces (oz)", servings: 28.349523125 / grams),
+      NativeAmountUnit(id: "lb", label: "Pounds (lb)", servings: 453.59237 / grams),
+      NativeAmountUnit(id: "kg", label: "Kilograms (kg)", servings: 1000 / grams), original,
+    ] + (portions ?? []).filter { $0.grams.isFinite && $0.grams > 0 }.map {
+      NativeAmountUnit(id: "portion-" + $0.id, label: $0.label, servings: $0.grams / grams)
+    }
+  }
 }
 struct DiaryEntry: Codable, Identifiable {
   var id: String
@@ -412,6 +460,11 @@ struct NativeDayContext: Encodable {
       var changed = false
       for i in state.customFoods.indices where state.customFoods[i].source == "USDA SR Legacy" {
         if let record = indexed[state.customFoods[i].id] {
+          if state.customFoods[i].portions == nil {
+            state.customFoods[i].portions = record.portions
+            state.customFoods[i].servingGrams = record.servingGrams
+            changed = true
+          }
           for id in added where state.customFoods[i].value(id) == nil {
             if let value = record.value(id) {
               state.customFoods[i].values[id] = .some(value)

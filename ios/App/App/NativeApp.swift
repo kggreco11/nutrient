@@ -355,13 +355,7 @@ struct NativeEntryEditor: View {
         if let food = store.food(entry.foodId) {
           Section {
             Text(food.name).font(.headline)
-            LabeledContent("Source serving", value: food.serving)
-            HStack {
-              Text("Servings")
-              Spacer()
-              TextField("Servings", value: $quantity, format: .number).keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-            }
+            NativeQuantityInput(food: food, quantity: $quantity)
             LabeledContent(
               "Energy",
               value: food.energyUnreported == true
@@ -580,6 +574,39 @@ struct MessageRow: View {
     }
   }
 }
+struct NativeQuantityInput: View {
+  let food: NativeFood
+  @Binding var quantity: Double
+  @State private var unitID = ""
+  private var unit: NativeAmountUnit {
+    food.amountUnits.first(where: { $0.id == unitID }) ?? food.amountUnits[0]
+  }
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack {
+        Text("Amount")
+        Spacer()
+        TextField("Amount", value: Binding(
+          get: { quantity / unit.servings },
+          set: { quantity = $0 * unit.servings }
+        ), format: .number.precision(.fractionLength(0...3)))
+          .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+          .frame(minWidth: 80, maxWidth: 140).accessibilityLabel("Food amount")
+      }
+      Picker("Unit", selection: Binding(
+        get: { unit.id }, set: { unitID = $0 }
+      )) {
+        ForEach(food.amountUnits) { option in Text(option.label).tag(option.id) }
+      }.pickerStyle(.menu)
+      if let grams = food.gramsPerServing {
+        Text("\((quantity * grams).formatted(.number.precision(.fractionLength(0...2)))) g · \(quantity.formatted(.number.precision(.fractionLength(0...3)))) × \(food.serving)")
+          .font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
+      } else {
+        Text("Per serving: \(food.serving)").font(.subheadline).foregroundStyle(.secondary)
+      }
+    }.padding(.vertical, 4)
+  }
+}
 struct NativeMealReview: View {
   @EnvironmentObject var store: NutrientStore
   @Environment(\.dismiss) var dismiss
@@ -596,13 +623,7 @@ struct NativeMealReview: View {
           ForEach($items) { $item in
             VStack(alignment: .leading, spacing: 8) {
               Text(item.food.name).font(.headline)
-              HStack {
-                Text("Servings of \(item.food.serving)").foregroundStyle(.secondary)
-                Spacer()
-                TextField("Servings", value: $item.quantity, format: .number).keyboardType(
-                  .decimalPad
-                ).multilineTextAlignment(.trailing).frame(width: 70)
-              }
+              NativeQuantityInput(food: item.food, quantity: $item.quantity)
               if let source = item.food.source {
                 Text(source).font(.caption).foregroundStyle(.secondary)
               }
@@ -920,6 +941,7 @@ struct NativeCustomFood: View {
   var scanOnOpen = false
   @State private var name = ""
   @State private var serving = "1 serving"
+  @State private var servingWeight = ""
   @State private var calories = ""
   @State private var values: [String: String] = [:]
   @State private var source = ""
@@ -955,6 +977,12 @@ struct NativeCustomFood: View {
         Section("Per serving") {
           TextField("Name", text: $name)
           TextField("Serving", text: $serving)
+          HStack {
+            Text("Serving weight")
+            Spacer()
+            TextField("Optional", text: $servingWeight).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+            Text("g").foregroundStyle(.secondary)
+          }
           TextField("Calories", text: $calories).keyboardType(.decimalPad)
           TextField("Source URL (optional)", text: $source).keyboardType(.URL)
             .textInputAutocapitalization(.never)
@@ -979,6 +1007,7 @@ struct NativeCustomFood: View {
         if let existing {
           name = existing.name
           serving = existing.serving
+          servingWeight = existing.gramsPerServing.map { String($0) } ?? ""
           calories = String(existing.calories)
           source = existing.sourceUrl ?? ""
           for n in store.nutrients { values[n.id] = existing.value(n.id).map { String($0) } ?? "" }
@@ -1010,6 +1039,7 @@ struct NativeCustomFood: View {
         guard let draft else { return }
         if !draft.name.isEmpty { name = draft.name }
         serving = draft.serving
+        servingWeight = ""
         calories = draft.calories.map { String($0) } ?? ""
         values = draft.values.mapValues { $0.map { String($0) } ?? "" }
         scanned = true
@@ -1023,6 +1053,7 @@ struct NativeCustomFood: View {
           ToolbarItem(placement: .confirmationAction) {
             Button("Save") { save() }.disabled(
               labelReader.busy || name.trimmingCharacters(in: .whitespaces).isEmpty || serving.trimmingCharacters(in: .whitespaces).isEmpty
+                || (!servingWeight.isEmpty && (Double(servingWeight) == nil || !(Double(servingWeight) ?? 0).isFinite || (Double(servingWeight) ?? 0) <= 0))
                 || Double(calories) == nil || (Double(calories) ?? -1) < 0
                 || values.values.contains {
                   !$0.isEmpty && (Double($0) == nil || (Double($0) ?? -1) < 0)
@@ -1049,7 +1080,8 @@ struct NativeCustomFood: View {
       id: "custom-" + UUID().uuidString, name: name, serving: serving,
       calories: Double(calories) ?? 0, values: nutrients, kind: supplement ? "supplement" : "food",
       source: scanned ? "Scanned nutrition label" : "Custom label", sourceUrl: source.isEmpty ? nil : source,
-      evidence: scanned ? labelReader.recognizedText : nil)
+      evidence: scanned ? labelReader.recognizedText : nil,
+      servingGrams: Double(servingWeight), portions: existing?.portions)
     if let existing { store.archive(existing) }
     store.state.customFoods.append(f)
     store.save()
@@ -1069,8 +1101,7 @@ struct NativeMealBuilder: View {
         ForEach($items) { $item in
           VStack(alignment: .leading) {
             Text(item.food.name)
-            TextField("Servings of \(item.food.serving)", value: $item.quantity, format: .number)
-              .keyboardType(.decimalPad)
+            NativeQuantityInput(food: item.food, quantity: $item.quantity)
           }
         }.onDelete { items.remove(atOffsets: $0) }
         Button("Add ingredient") { search = true }

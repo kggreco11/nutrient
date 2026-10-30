@@ -26,6 +26,27 @@ import UIKit
     let food = NativeFood(
       id: "test-food", name: "Test oats", serving: "100 g", calories: 100,
       values: ["protein": 10, "magnesium": 50])
+    let oz = food.amountUnits.first { $0.id == "oz" }!
+    precondition(abs(4 * oz.servings * food.gramsPerServing! - 113.3980925) < 0.000001)
+    precondition(abs(4 * oz.servings * food.value("protein")! - 11.33980925) < 0.000001)
+    var measured = food
+    measured.serving = "2/3 cup (55 g)"
+    precondition(measured.gramsPerServing == 55)
+    measured.serving = "1 oz (28 g)"
+    precondition(measured.gramsPerServing == 28)
+    measured.serving = "1/2 oz"
+    precondition(measured.gramsPerServing == nil)
+    measured.serving = "1 cup"
+    precondition(measured.amountUnits.count == 1, "Volume must not assume water density")
+    measured.servingGrams = 160
+    measured.portions = [NativePortionMeasure(id: "cup", label: "cup, cooked", grams: 160)]
+    let cup = measured.amountUnits.first { $0.id == "portion-cup" }!
+    precondition(0.5 * cup.servings * measured.gramsPerServing! == 80)
+    let pounds = food.amountUnits.first { $0.id == "lb" }!
+    precondition(abs(pounds.servings * 100 - 453.59237) < 0.000001)
+    let roundtrip = try JSONDecoder().decode(NativeFood.self, from: JSONEncoder().encode(measured))
+    precondition(roundtrip.portions?.first?.grams == 160 && roundtrip.servingGrams == 160)
+    print("Mass conversion, food-specific measures, label weights and portion persistence passed")
     store.log([MealItem(food: food, quantity: 1)], meal: "Breakfast")
     let entry = store.day.entries[0]
     try store.updateEntry(entry, from: start, to: start, quantity: 2, meal: "Lunch")

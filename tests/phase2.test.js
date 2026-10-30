@@ -155,3 +155,12 @@ test("database keyword search does not mistake strawberries for a raw preparatio
 test("exact database food names rank ahead of derivative foods", () => {
   assert.match(searchDatabase(database, "oats")[0].name, /^Oats /);
 });
+
+test("USDA household portions keep food-specific gram weights", () => {
+  assert.ok(database.filter(f => f.portions?.length).length > 7500);
+  assert.ok(database.every(f => f.servingGrams === 100 && f.portions.every(p => typeof p.label === "string" && p.grams > 0 && Number.isFinite(p.grams))));
+  const milk = database.find(f => f.name === "Milk, whole, 3.25% milkfat, with added vitamin D");
+  assert.equal(milk.portions.find(p => p.label === "cup").grams, 244);
+  assert.equal(milk.portions.find(p => p.label === "fl oz").grams, 30.5);
+  assert.equal(milk.portions.find(p => p.label === "tbsp").grams, 15);
+});
