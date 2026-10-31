@@ -152,3 +152,5 @@ Open `http://127.0.0.1:5188/`. The HTML files are design-review artifacts; the s
 The [latest layout review](design/2026-10-31/navigation-notes.md) compares **Journal**, **Capture**, and **Meals** using the same palette and different page structures. Open `http://127.0.0.1:5188/navigation.html` after starting the review server.
 
 ![Three tab-free layout directions](design/2026-10-31/navigation-comparison.jpg)
+
+The [native polish pass](design/2026-10-31/audit/fixes.md) addresses all eight design-audit findings: compact progress and ingredient review, earlier trend priorities, adaptive text layouts, respectful chat scrolling, clearer food search, and explicit calorie-overage wording.

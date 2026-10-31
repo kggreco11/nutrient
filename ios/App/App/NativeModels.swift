@@ -178,6 +178,16 @@ func number(_ value: Double) -> String {
   value.formatted(.number.precision(.fractionLength(0...(value < 10 ? 1 : 0))))
 }
 
+func calorieBalanceText(intake: Double, target: Double) -> String {
+  let remaining = target - intake
+  return "\(number(abs(remaining))) kcal \(remaining < 0 ? "over" : "left")"
+}
+enum NativeChatFollow {
+  static func shouldScroll(userInitiated: Bool, nearBottom: Bool) -> Bool {
+    userInitiated || nearBottom
+  }
+}
+
 struct DailyNutrientProgress: Identifiable {
   let nutrient: NutrientDefinition
   let consumed: Double

@@ -5,15 +5,57 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct NutrientAppView: View {
-  @StateObject private var store = NutrientStore()
+  @StateObject private var store: NutrientStore
+  init() {
+    #if DEBUG
+      if NativeDesignFixture.enabled {
+        let storage = FileManager.default.temporaryDirectory.appendingPathComponent(
+          "nutrient-design-fixture.json")
+        let preview = NutrientStore(storageURL: storage, mirrorPreferences: false)
+        NativeDesignFixture.prepare(preview)
+        _store = StateObject(wrappedValue: preview)
+        return
+      }
+    #endif
+    _store = StateObject(wrappedValue: NutrientStore())
+  }
+  @ViewBuilder private var content: some View {
+    #if DEBUG
+      if NativeDesignFixture.enabled {
+        switch NativeDesignFixture.argument("--design-screen") {
+        case "review": NativeMealReview(items: NativeDesignFixture.ingredients)
+        case "trends": NavigationStack { NativeTrends() }
+        case "nutrient": NavigationStack { NativeNutrientDetail(id: "protein") }
+        case "chat": NativeChat()
+        default: NativeToday()
+        }
+      } else {
+        NativeToday()
+      }
+    #else
+      NativeToday()
+    #endif
+  }
   var body: some View {
-    NativeToday()
+    content
       .sheet(isPresented: $store.showingChat) {
         NativeChat().environmentObject(store).presentationDragIndicator(.visible)
       }
       .environmentObject(store).tint(nutrientGreen)
       .foregroundStyle(Color("FieldInk"))
-      .task { await store.loadDatabase() }
+      .task {
+        #if DEBUG
+          if NativeDesignFixture.enabled {
+            if ["reading", "follow"].contains(NativeDesignFixture.argument("--design-fixture") ?? "") {
+              try? await Task.sleep(for: .seconds(2))
+              store.state.chatHistory = store.history + [NativeMessage(
+                role: "assistant", content: "New assistant response at the end of the conversation.")]
+            }
+            return
+          }
+        #endif
+        await store.loadDatabase()
+      }
       .alert(
         "Couldn't complete that",
         isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })
@@ -26,13 +68,40 @@ struct NutrientAppView: View {
 }
 let calorieAccent = Color("FieldOchre")
 
+// Spacing describes relationships; Dynamic Type may grow every minimum.
+enum FieldSpace {
+  static let tight: CGFloat = 4
+  static let item: CGFloat = 8
+  static let controls: CGFloat = 12
+  static let inset: CGFloat = 16
+  static let gutter: CGFloat = 20
+  static let section: CGFloat = 24
+  static let row: CGFloat = 52
+}
+struct FieldValuePair<Leading: View, Trailing: View>: View {
+  @ViewBuilder var leading: Leading
+  @ViewBuilder var trailing: Trailing
+  var body: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .firstTextBaseline, spacing: FieldSpace.item) {
+        leading.fixedSize(horizontal: true, vertical: false)
+        Spacer(minLength: FieldSpace.item)
+        trailing.fixedSize(horizontal: true, vertical: false)
+      }
+      VStack(alignment: .leading, spacing: FieldSpace.tight) {
+        leading
+        trailing
+      }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+}
 // Shared native surfaces: field-journal colors with system controls and Dynamic Type.
 struct FieldSurface: ViewModifier {
   func body(content: Content) -> some View {
     content.scrollContentBackground(.hidden)
       .background(Color("FieldBackground"))
       .scrollIndicators(.hidden)
-      .environment(\.defaultMinListRowHeight, 52)
+      .environment(\.defaultMinListRowHeight, FieldSpace.row)
       .monospacedDigit()
   }
 }
@@ -65,7 +134,7 @@ struct FieldList<Content: View>: View {
   @ViewBuilder var content: Content
   var body: some View {
     List { content.listRowBackground(Color("FieldSurface")) }
-      .listStyle(.insetGrouped).fieldSurface()
+      .listStyle(.insetGrouped).listSectionSpacing(FieldSpace.section).fieldSurface()
   }
 }
 struct FieldForm<Content: View>: View {
@@ -75,31 +144,38 @@ struct FieldForm<Content: View>: View {
   }
 }
 struct DashboardRing: View {
+  @Environment(\.dynamicTypeSize) private var typeSize
   let title: String
   let value: Double
   let target: Double
   let unit: String
   let detail: String
   let color: Color
-  @ScaledMetric(relativeTo: .title2) private var diameter = 116.0
+  private var fraction: Double { min(1, max(0, value / max(1, target))) }
   var body: some View {
-    VStack(spacing: 12) {
-      Text(title).font(.subheadline.weight(.semibold)).multilineTextAlignment(.center)
-      ZStack {
-        Circle().stroke(color.opacity(0.18), lineWidth: 10)
-        Circle().trim(from: 0, to: min(1, max(0, value / max(1, target)))).stroke(
-          color, style: StrokeStyle(lineWidth: 10, lineCap: .round)
-        ).rotationEffect(.degrees(-90))
-        VStack(spacing: 2) {
-          Text(number(value)).font(.system(.title, design: .default).weight(.semibold))
-            .minimumScaleFactor(0.75).lineLimit(1)
-          Text(unit).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
-        }.padding(10)
-      }.frame(width: min(190, diameter), height: min(190, diameter))
+    VStack(spacing: FieldSpace.item) {
+      Text(title).font(.subheadline.weight(.semibold))
+      if typeSize.isAccessibilitySize {
+        Text("\(number(value)) \(unit)").font(.title.weight(.semibold))
+          .fixedSize(horizontal: false, vertical: true)
+        ProgressView(value: fraction).tint(color)
+      } else {
+        ZStack {
+          Circle().stroke(color.opacity(0.18), lineWidth: 8)
+          Circle().trim(from: 0, to: fraction).stroke(
+            color, style: StrokeStyle(lineWidth: 8, lineCap: .round)
+          ).rotationEffect(.degrees(-90))
+          VStack(spacing: 2) {
+            Text(number(value)).font(.title2.weight(.semibold))
+            Text(unit).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+          }
+        }.frame(width: 100, height: 100)
+      }
       Text(detail).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
-        .multilineTextAlignment(.center)
-    }.frame(maxWidth: .infinity).accessibilityElement(children: .ignore).accessibilityLabel(
-      "\(title), \(number(value)) \(unit), \(detail)")
+        .fixedSize(horizontal: false, vertical: true)
+    }.multilineTextAlignment(.center).frame(maxWidth: .infinity)
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel("\(title), \(number(value)) \(unit), \(detail)")
   }
 }
 struct NativeToday: View {
@@ -113,58 +189,63 @@ struct NativeToday: View {
       FieldList {
         Section {
           (typeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))) {
+            ? AnyLayout(VStackLayout(spacing: FieldSpace.controls))
+            : AnyLayout(HStackLayout(spacing: FieldSpace.controls))) {
               Button {
                 scan = true
               } label: {
                 Label("Scan barcode", systemImage: "barcode.viewfinder")
-                  .font(.headline).frame(maxWidth: .infinity, minHeight: 60)
+                  .font(.headline).frame(maxWidth: .infinity, minHeight: 44)
               }.buttonStyle(.bordered).tint(nutrientGreen)
               Button {
                 store.showingChat = true
               } label: {
                 Label("Quick log", systemImage: "bubble.left.and.text.bubble.right")
-                  .font(.headline).frame(maxWidth: .infinity, minHeight: 60)
+                  .font(.headline).frame(maxWidth: .infinity, minHeight: 44)
               }.buttonStyle(.borderedProminent).foregroundStyle(nutrientOnGreen)
-            }.listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            }.listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
         }
         Section {
-          (typeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(spacing: 24))
-            : AnyLayout(HStackLayout(alignment: .top, spacing: 16))) {
-              DashboardRing(
-                title: "Coverage", value: store.score(), target: 100, unit: "%",
-                detail:
-                  "\(tracked.filter{store.reported($0.id) && store.total($0.id) >= (store.state.targets[$0.id] ?? $0.target)}.count) of \(tracked.count) targets met",
-                color: nutrientGreen)
-              DashboardRing(
-                title: "Calories", value: store.total("calories"),
-                target: store.state.calorieTarget,
-                unit: "kcal",
-                detail:
-                  "\(number(max(0, store.state.calorieTarget - store.total("calories")))) kcal left",
-                color: calorieAccent)
-            }.padding(.vertical, 12).listRowBackground(Color("FieldSurface"))
-          ForEach(["protein", "carbs", "fat"], id: \.self) { id in
-            let value = store.total(id)
-            let target = store.state.targets[id] ?? 1
-            NavigationLink {
-              NativeNutrientDetail(id: id)
-            } label: {
-              VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                  Text(id == "carbs" ? "Carbs" : id.capitalized).font(
-                    .subheadline.weight(.semibold))
-                  Spacer()
-                  Text("\(number(value)) / \(number(target)) g").font(.subheadline).foregroundStyle(
-                    Color("FieldSecondary"))
-                }
-                ProgressView(value: min(value / target, 1)).tint(nutrientGreen).scaleEffect(
-                  x: 1, y: 1.7, anchor: .center)
-              }.padding(.vertical, 7)
-            }.foregroundStyle(.primary).accessibilityHint("See contributing foods")
-          }
+          VStack(spacing: FieldSpace.controls) {
+            (typeSize.isAccessibilitySize
+              ? AnyLayout(VStackLayout(spacing: FieldSpace.section))
+              : AnyLayout(HStackLayout(alignment: .top, spacing: FieldSpace.inset))) {
+                DashboardRing(
+                  title: "Coverage", value: store.score(), target: 100, unit: "%",
+                  detail:
+                    "\(tracked.filter{store.reported($0.id) && store.total($0.id) >= (store.state.targets[$0.id] ?? $0.target)}.count) of \(tracked.count) targets met",
+                  color: nutrientGreen)
+                DashboardRing(
+                  title: "Calories", value: store.total("calories"),
+                  target: store.state.calorieTarget,
+                  unit: "kcal",
+                  detail: calorieBalanceText(
+                    intake: store.total("calories"), target: store.state.calorieTarget),
+                  color: calorieAccent)
+              }
+            VStack(spacing: 0) {
+              ForEach(["protein", "carbs", "fat"], id: \.self) { id in
+                let value = store.total(id)
+                let target = store.state.targets[id] ?? 1
+                NavigationLink {
+                  NativeNutrientDetail(id: id)
+                } label: {
+                  VStack(alignment: .leading, spacing: FieldSpace.item) {
+                    FieldValuePair {
+                      Text(id == "carbs" ? "Carbs" : id.capitalized).font(
+                        .subheadline.weight(.semibold))
+                    } trailing: {
+                      Text("\(number(value)) / \(number(target)) g")
+                        .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+                    }
+                    ProgressView(value: min(value / target, 1)).tint(nutrientGreen)
+                  }.frame(minHeight: FieldSpace.row).contentShape(Rectangle())
+                }.buttonStyle(.plain).foregroundStyle(.primary)
+                  .accessibilityHint("See contributing foods")
+              }
+            }
+          }.padding(FieldSpace.inset).listRowInsets(EdgeInsets())
         }
         NativeDailyGaps()
         Section { NavigationLink("All \(store.nutrients.count) nutrients") { NativeNutrients() } }
@@ -185,7 +266,9 @@ struct NativeToday: View {
             "\(store.day.water) / \(store.state.waterTarget) glasses",
             value: Binding(get: { store.day.water }, set: { store.water($0) }), in: 0...30)
         }
-      }.fieldSurface().fieldTitle("Today")
+      }.listSectionSpacing(FieldSpace.inset)
+        .contentMargins(.top, FieldSpace.item, for: .scrollContent)
+        .fieldSurface().fieldTitle("Today")
         .onAppear { store.date = Date() }
         .toolbar {
           ToolbarItem(placement: .topBarLeading) {
@@ -214,8 +297,8 @@ struct NativeToday: View {
             Button {
               add = true
             } label: {
-              Image(systemName: "plus")
-            }.accessibilityLabel("Log food")
+              Image(systemName: "magnifyingglass")
+            }.accessibilityLabel("Search foods")
           }
         }
         .sheet(isPresented: $add) { NativeFoodSearch() }
@@ -237,14 +320,14 @@ struct NativeDailyGaps: View {
             ? "All nutrient targets met" : "All reported targets met"
         ).foregroundStyle(nutrientGreen)
       }
-      ForEach(Array(store.dailyGaps.prefix(expanded || showAll ? 31 : 5))) { gap in
+      ForEach(Array(store.dailyGaps.prefix(expanded || showAll ? 31 : 3))) { gap in
         NavigationLink {
           NativeNutrientDetail(id: gap.id)
         } label: {
-          VStack(alignment: .leading, spacing: 7) {
-            HStack {
+          VStack(alignment: .leading, spacing: FieldSpace.item) {
+            FieldValuePair {
               Text(gap.nutrient.name)
-              Spacer()
+            } trailing: {
               Text("\(number(gap.remaining)) \(gap.nutrient.unit) left").font(
                 .subheadline.weight(.semibold)
               ).foregroundStyle(nutrientGreen)
@@ -256,7 +339,7 @@ struct NativeDailyGaps: View {
           }.padding(.vertical, 4)
         }.foregroundStyle(.primary)
       }
-      if !showAll && store.dailyGaps.count > 5 {
+      if !showAll && store.dailyGaps.count > 3 {
         Button(expanded ? "Show fewer" : "Show all \(store.dailyGaps.count) shortfalls") {
           expanded.toggle()
         }
@@ -311,13 +394,13 @@ struct NativeNutrientDetail: View {
       Section {
         Text(store.date, format: .dateTime.month(.wide).day().year()).font(.subheadline)
           .foregroundStyle(Color("FieldSecondary"))
-        HStack(alignment: .firstTextBaseline) {
+        FieldValuePair {
           Text(
             store.reported(id)
               ? "\(store.incomplete(id) ? "≥ " : "")\(number(store.total(id))) \(nutrient.unit)"
               : "Not reported"
           ).font(.title2.bold())
-          Spacer()
+        } trailing: {
           Text("of \(number(store.state.targets[id] ?? nutrient.target)) \(nutrient.unit)")
             .foregroundStyle(Color("FieldSecondary"))
         }
@@ -332,13 +415,13 @@ struct NativeNutrientDetail: View {
           ).foregroundStyle(Color("FieldSecondary"))
         }
         ForEach(contributions.filter { ($0.amount ?? 0) > 0 }) { item in
-          VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .top) {
+          VStack(alignment: .leading, spacing: FieldSpace.item) {
+            FieldValuePair {
               Text(item.food.name)
-              Spacer()
+            } trailing: {
               Text("\(item.partial ? "≥ " : "")\(number(item.amount ?? 0)) \(nutrient.unit)").font(
                 .headline
-              ).foregroundStyle(nutrientGreen).fixedSize(horizontal: true, vertical: false)
+              ).foregroundStyle(nutrientGreen)
             }
             Text("\(number(item.entry.quantity)) × \(item.food.serving) · \(item.entry.meal)").font(
               .subheadline
@@ -348,9 +431,9 @@ struct NativeNutrientDetail: View {
             {
               DisclosureGroup("Ingredients") {
                 ForEach(Array(components.enumerated()), id: \.offset) { _, component in
-                  HStack(alignment: .top) {
+                  FieldValuePair {
                     Text(component.name)
-                    Spacer()
+                  } trailing: {
                     if let value = component.values?[id] ?? nil {
                       Text(
                         "\(number(value * component.quantity * item.entry.quantity)) \(nutrient.unit)"
@@ -393,10 +476,10 @@ struct NativeNutrientRow: View {
     NavigationLink {
       NativeNutrientDetail(id: nutrient.id)
     } label: {
-      VStack(alignment: .leading, spacing: 7) {
-        HStack(alignment: .firstTextBaseline) {
+      VStack(alignment: .leading, spacing: FieldSpace.item) {
+        FieldValuePair {
           Text(nutrient.name)
-          Spacer()
+        } trailing: {
           Text(
             store.reported(nutrient.id)
               ? "\(number(value)) / \(number(target)) \(nutrient.unit)"
@@ -428,13 +511,13 @@ struct NativeLoggedEntry: View {
       Button {
         edit = true
       } label: {
-        HStack(alignment: .top) {
+        FieldValuePair {
           VStack(alignment: .leading, spacing: 5) {
             Text(food.name).foregroundStyle(.primary)
             Text("\(number(entry.quantity)) × \(food.serving) · \(entry.meal)").font(.subheadline)
               .foregroundStyle(Color("FieldSecondary"))
           }
-          Spacer()
+        } trailing: {
           VStack(alignment: .trailing, spacing: 8) {
             Text(
               food.energyUnreported == true
@@ -712,8 +795,21 @@ struct NativeNutrients: View {
     }.searchable(text: $query, prompt: "Find a nutrient").fieldSurface().fieldTitle("Nutrients")
   }
 }
+private struct ChatBottomKey: PreferenceKey {
+  static var defaultValue: CGFloat = .greatestFiniteMagnitude
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = min(value, nextValue())
+  }
+}
+private struct ChatViewportKey: PreferenceKey {
+  static var defaultValue: CGFloat = 0
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = max(value, nextValue())
+  }
+}
 struct NativeChat: View {
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @EnvironmentObject var store: NutrientStore
   @StateObject private var speech = NativeDictation()
   @State private var speechPrefix = ""
@@ -721,11 +817,19 @@ struct NativeChat: View {
   @State private var scan = false
   @State private var search = false
   @FocusState private var focused: Bool
+  @State private var viewportHeight: CGFloat = 0
+  @State private var bottomPosition: CGFloat = .greatestFiniteMagnitude
+  @State private var nearBottom = true
+  @State private var unreadResponse = false
+  @State private var jumpRequest = 0
+  @State private var followKeyboardResize = false
+  @State private var followAfterLayout = false
+  @State private var userDragging = false
   var body: some View {
     NavigationStack {
       ScrollViewReader { proxy in
         ScrollView {
-          LazyVStack(alignment: .leading, spacing: 20) {
+          LazyVStack(alignment: .leading, spacing: FieldSpace.section) {
             if store.history.isEmpty {
               Text("What did you eat?").font(.title3).foregroundStyle(Color("FieldSecondary"))
                 .frame(
@@ -736,7 +840,7 @@ struct NativeChat: View {
               MessageRow(message: message).id(index)
             }
             if store.sending {
-              HStack(spacing: 10) {
+              HStack(spacing: FieldSpace.item) {
                 ProgressView()
                 Text("Looking up your meal…").foregroundStyle(Color("FieldSecondary"))
               }
@@ -753,7 +857,7 @@ struct NativeChat: View {
               }
             }
             if !store.pending.isEmpty {
-              VStack(alignment: .leading, spacing: 14) {
+              VStack(alignment: .leading, spacing: FieldSpace.controls) {
                 Text("Meal draft").font(.headline)
                 ForEach(store.pending) { item in
                   VStack(alignment: .leading, spacing: 4) {
@@ -775,25 +879,108 @@ struct NativeChat: View {
                   Label("Review meal", systemImage: "checklist").frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                 }.buttonStyle(.borderedProminent).foregroundStyle(nutrientOnGreen)
-              }.padding(18).background(
+              }.padding(FieldSpace.inset).background(
                 Color("FieldSurface"), in: RoundedRectangle(cornerRadius: 18)
               )
               .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color("FieldRule"), lineWidth: 1))
             }
             Color.clear.frame(height: 1).id("bottom")
-          }.padding(16)
-        }.fieldSurface().scrollDismissesKeyboard(.interactively)
-          .onChange(of: store.history.count) {
-            withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+          }.padding(FieldSpace.inset).background {
+            GeometryReader { geometry in
+              Color.clear.preference(
+                key: ChatBottomKey.self,
+                value: geometry.frame(in: .named("chatViewport")).maxY)
+            }
           }
-          .onChange(of: focused) {
-            if focused { withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
+        }.simultaneousGesture(
+          DragGesture(minimumDistance: 2)
+            .onChanged { _ in
+              userDragging = true
+              followAfterLayout = false
+              followKeyboardResize = false
+            }
+            .onEnded { _ in
+              updateProximity()
+              userDragging = false
+            }
+        ).coordinateSpace(name: "chatViewport")
+          .background {
+            GeometryReader { geometry in
+              Color.clear.preference(key: ChatViewportKey.self, value: geometry.size.height)
+            }
           }
-          .onChange(of: store.sending) {
-            withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+          .onPreferenceChange(ChatBottomKey.self) { value in
+            let changed = bottomPosition != value
+            bottomPosition = value
+            updateProximity()
+            if changed && followAfterLayout && !userDragging {
+              followAfterLayout = false
+              scrollToBottom(proxy)
+            }
           }
-          .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
-          .safeAreaInset(edge: .bottom, spacing: 0) { composer }
+          .onPreferenceChange(ChatViewportKey.self) { value in
+            viewportHeight = value
+            updateProximity()
+          }
+          .fieldSurface().scrollDismissesKeyboard(.interactively)
+          .onChange(of: store.history.count) { _, _ in
+            let userInitiated = store.history.last?.role == "user"
+            if NativeChatFollow.shouldScroll(
+              userInitiated: userInitiated, nearBottom: nearBottom && !userDragging)
+            {
+              followAfterLayout = true
+              scrollToBottom(proxy)
+            } else {
+              unreadResponse = true
+            }
+          }
+          .onChange(of: focused) { _, active in
+            followKeyboardResize = active
+            if active { scrollToBottom(proxy) }
+          }
+          .onReceive(
+            NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)
+          ) { _ in
+            if followKeyboardResize {
+              scrollToBottom(proxy, animated: false)
+              followKeyboardResize = false
+            }
+          }
+          .onChange(of: store.sending) { _, _ in
+            if nearBottom && !userDragging {
+              followAfterLayout = true
+              scrollToBottom(proxy)
+            }
+          }
+          .onChange(of: store.pending.count) { _, _ in
+            if nearBottom && !userDragging {
+              followAfterLayout = true
+              scrollToBottom(proxy)
+            }
+          }
+          .onChange(of: jumpRequest) { _, _ in scrollToBottom(proxy) }
+          .onAppear {
+            #if DEBUG
+              if NativeDesignFixture.argument("--design-fixture") == "reading" {
+                nearBottom = false
+                proxy.scrollTo(0, anchor: .top)
+                return
+              }
+            #endif
+            scrollToBottom(proxy, animated: false)
+          }
+          .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+              if unreadResponse {
+                HStack {
+                  Spacer()
+                  Button("Latest message", systemImage: "arrow.down") { jumpRequest += 1 }
+                    .buttonStyle(.bordered).frame(minHeight: 44)
+                }.padding(.horizontal, FieldSpace.inset)
+              }
+              composer
+            }.background(Color("FieldBackground"))
+          }
       }
       .fieldSurface().fieldTitle("Quick log")
       .toolbar {
@@ -811,7 +998,12 @@ struct NativeChat: View {
       .sheet(isPresented: $scan) { NativeScanSheet() }
       .sheet(isPresented: $search) { NativeFoodSearch() }
       .onChange(of: speech.transcript) { _, text in store.draft = speechPrefix + text }
-      .onAppear { focused = true }
+      .onAppear {
+        #if DEBUG
+          if NativeDesignFixture.argument("--design-fixture") == "reading" { return }
+        #endif
+        focused = true
+      }
       .onDisappear { speech.stop() }
       .alert(
         "Dictation",
@@ -821,6 +1013,23 @@ struct NativeChat: View {
       } message: {
         Text(speech.error ?? "")
       }
+    }
+  }
+  private func updateProximity() {
+
+    // Content growth must not replace the reader's intent before history onChange runs.
+    guard viewportHeight > 0, userDragging || !nearBottom else { return }
+    nearBottom = bottomPosition <= viewportHeight + 64
+    if nearBottom { unreadResponse = false }
+  }
+  private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool = true) {
+
+    nearBottom = true
+    unreadResponse = false
+    if reduceMotion || !animated {
+      proxy.scrollTo("bottom", anchor: .bottom)
+    } else {
+      withAnimation(.easeOut(duration: 0.18)) { proxy.scrollTo("bottom", anchor: .bottom) }
     }
   }
   private var composer: some View {
@@ -846,6 +1055,7 @@ struct NativeChat: View {
       }.accessibilityLabel(speech.listening ? "Stop dictation" : "Dictate a meal")
       Button {
         let message = store.draft
+        jumpRequest += 1
         speech.stop()
         focused = false
         Task { await store.send(message) }
@@ -884,7 +1094,7 @@ struct NativeQuantityInput: View {
     food.amountUnits.first(where: { $0.id == unitID }) ?? food.amountUnits[0]
   }
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: FieldSpace.item) {
       HStack {
         Text("Amount")
         Spacer()
@@ -930,24 +1140,46 @@ struct NativeMealReview: View {
   @State private var meal = "Breakfast"
   @State private var name = ""
   @State private var saveMeal = false
+  @State private var expandedItem: UUID?
   var calories: Double { items.reduce(0) { $0 + $1.food.calories * $1.quantity } }
   var body: some View {
     NavigationStack {
       FieldForm {
         Section {
           ForEach($items) { $item in
-            VStack(alignment: .leading, spacing: 8) {
-              Text(item.food.name).font(.headline)
+            DisclosureGroup(
+              isExpanded: Binding(
+                get: { expandedItem == item.id },
+                set: { expandedItem = $0 ? item.id : nil }
+              )
+            ) {
               NativeQuantityInput(food: item.food, quantity: $item.quantity)
               if let source = item.food.source {
-                Text(source).font(.caption).foregroundStyle(Color("FieldSecondary"))
+                Text(source).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
               }
               if let url = item.food.sourceUrl, let link = URL(string: url), link.scheme == "https"
               {
-                Link("Source", destination: link).font(.caption)
+                Link("Source", destination: link)
               }
-            }.padding(.vertical, 4)
-          }.onDelete { items.remove(atOffsets: $0) }
+            } label: {
+              VStack(alignment: .leading, spacing: FieldSpace.tight) {
+                Text(item.food.name).font(.body.weight(.medium)).foregroundStyle(.primary)
+                FieldValuePair {
+                  Text(
+                    item.food.gramsPerServing.map {
+                      "\(number(item.quantity * $0)) g"
+                    } ?? "\(number(item.quantity)) × \(item.food.serving)")
+                } trailing: {
+                  Text(
+                    item.food.energyUnreported == true
+                      ? "Energy unreported" : "\(number(item.food.calories * item.quantity)) kcal")
+                }.font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+              }.frame(minHeight: FieldSpace.row, alignment: .leading)
+            }
+          }.onDelete { offsets in
+            if offsets.contains(where: { items[$0].id == expandedItem }) { expandedItem = nil }
+            items.remove(atOffsets: offsets)
+          }
           Button("Scan another item", systemImage: "barcode.viewfinder") { scanMore = true }
           Button("Add from foods", systemImage: "plus") { addIngredient = true }
         }
@@ -993,6 +1225,15 @@ struct NativeMealReview: View {
           )
 
           .padding().background(Color("FieldBackground"))
+        }
+        .onAppear {
+          #if DEBUG
+            if NativeDesignFixture.enabled
+              && ProcessInfo.processInfo.arguments.contains("--expand-first")
+            {
+              expandedItem = items.first?.id
+            }
+          #endif
         }
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
         .sheet(isPresented: $scanMore) {
@@ -1211,50 +1452,42 @@ struct NativeTrends: View {
           chart.frame(height: 220).padding(.vertical, 10)
         }
       }
-      if !buckets.isEmpty {
-        Section(interval == .daily ? "By day" : interval == .weekly ? "By week" : "By month") {
-          ForEach(buckets.reversed()) { bucket in
-            LabeledContent {
-              Text("\(bucket.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)")
-                .monospacedDigit().foregroundStyle(nutrientGreen)
-            } label: {
-              Text(periodLabel(bucket.date))
-            }
+      if averages.isEmpty {
+        Section {
+          Text("Log meals to see your averages and gaps.").foregroundStyle(Color("FieldSecondary"))
+          Button("Quick log a meal") { store.showingChat = true }
+        }
+      } else {
+        let shortfalls = averages.filter { $0.gap > 0 }
+        Section("Largest recorded shortfalls") {
+          if shortfalls.isEmpty {
+            Text("All reported averages meet their targets.").foregroundStyle(
+              Color("FieldSecondary"))
+          }
+          ForEach(Array(shortfalls.prefix(3))) { average in
+            NativeAverageRow(average: average)
+          }
+        }
+        Section {
+          DisclosureGroup("All nutrient averages") {
+            ForEach(averages) { average in NativeAverageRow(average: average) }
           }
         }
       }
-      if averages.isEmpty {
+      if !buckets.isEmpty {
         Section {
-          Text("Log meals to see your averages and gaps.").foregroundStyle(
-            Color("FieldSecondary"))
-          Button("Log a meal in Chat") { store.showingChat = true }
-        }
-      } else {
-        Section("Average daily intake") {
-          ForEach(averages) { average in
-            VStack(alignment: .leading, spacing: 7) {
-              HStack {
-                Text(average.nutrient.name).font(.headline)
-                Spacer()
-                Text("\(number(average.percentage))%").foregroundStyle(nutrientGreen)
-              }
-              HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
-                  Text("\(number(average.value)) \(average.nutrient.unit)")
-                  Text("Target \(number(average.target)) \(average.nutrient.unit)").font(.caption)
-                    .foregroundStyle(Color("FieldSecondary"))
-                }
-                Spacer()
-                Text(
-                  average.gap > 0
-                    ? "Gap \(number(average.gap)) \(average.nutrient.unit)" : "Target met"
-                ).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
-              }
-              ProgressView(value: min(1, average.percentage / 100)).tint(nutrientGreen)
-              if !average.complete {
-                Text("Partial data").font(.caption).foregroundStyle(Color("FieldSecondary"))
-              }
-            }.padding(.vertical, 6)
+          DisclosureGroup(
+            interval == .daily
+              ? "Daily values" : interval == .weekly ? "Weekly values" : "Monthly values"
+          ) {
+            ForEach(buckets.reversed()) { bucket in
+              FieldValuePair {
+                Text(periodLabel(bucket.date))
+              } trailing: {
+                Text("\(bucket.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)")
+                  .monospacedDigit().foregroundStyle(nutrientGreen)
+              }.accessibilityElement(children: .combine)
+            }
           }
         }
       }
@@ -1310,6 +1543,34 @@ struct NativeTrends: View {
         "\(date.formatted(.dateTime.month(.abbreviated).day())) – \(end.formatted(.dateTime.month(.abbreviated).day()))"
     case .monthly: return date.formatted(.dateTime.month(.wide).year())
     }
+  }
+}
+struct NativeAverageRow: View {
+  let average: IntakeAverage
+  var body: some View {
+    VStack(alignment: .leading, spacing: FieldSpace.item) {
+      FieldValuePair {
+        Text(average.nutrient.name).font(.headline)
+      } trailing: {
+        Text("\(number(average.percentage))%").foregroundStyle(nutrientGreen)
+      }
+      FieldValuePair {
+        VStack(alignment: .leading, spacing: FieldSpace.tight) {
+          Text("\(number(average.value)) \(average.nutrient.unit)")
+          Text("Target \(number(average.target)) \(average.nutrient.unit)")
+            .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+        }
+      } trailing: {
+        Text(
+          average.gap > 0 ? "\(number(average.gap)) \(average.nutrient.unit) short" : "Target met"
+        )
+        .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+      }
+      ProgressView(value: min(1, average.percentage / 100)).tint(nutrientGreen)
+      if !average.complete {
+        Text("Partial data").font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+      }
+    }.padding(.vertical, FieldSpace.tight)
   }
 }
 struct NativeLibrary: View {
@@ -1712,3 +1973,77 @@ struct NativeSettings: View {
       }
   }
 }
+
+#if DEBUG
+  // Isolated fixtures exercise native geometry without touching the real diary or making requests.
+  @MainActor private enum NativeDesignFixture {
+    static func argument(_ flag: String) -> String? {
+      let args = ProcessInfo.processInfo.arguments
+      guard let index = args.firstIndex(of: flag), args.indices.contains(index + 1) else {
+        return nil
+      }
+      return args[index + 1]
+    }
+    static var enabled: Bool { argument("--design-fixture") != nil }
+    static var ingredients: [MealItem] {
+      [
+        NativeFood(
+          id: "fixture-bread", name: "Whole-grain bread", serving: "2 slices (64 g)", calories: 170,
+          values: ["protein": 8], servingGrams: 64),
+        NativeFood(
+          id: "fixture-cheese", name: "Cheddar", serving: "35 g", calories: 141,
+          values: ["protein": 9], servingGrams: 35),
+        NativeFood(
+          id: "fixture-butter", name: "Butter", serving: "5 g", calories: 36,
+          values: ["protein": 0], servingGrams: 5),
+      ].map { MealItem(food: $0, quantity: 1) }
+    }
+    static func prepare(_ store: NutrientStore) {
+      store.state.days = [:]
+      store.state.customFoods = []
+      store.state.chatHistory = []
+      store.state.pendingMeal = nil
+      store.date = Date()
+      guard argument("--design-fixture") != "empty" else { return }
+      var values: [String: Double?] = [:]
+      for (index, n) in store.nutrients.enumerated() {
+        values[n.id] = (store.state.targets[n.id] ?? n.target) * (index < 24 ? 1.05 : 0.8)
+      }
+      values["protein"] = 128
+      values["carbs"] = 342
+      values["fat"] = 67
+      values["vitC"] = 41
+      values["fiber"] = 30
+      values["magnesium"] = 336
+      let energy = argument("--design-fixture") == "over" ? 3700.0 : 2480.0
+      let sample = NativeFood(
+        id: "fixture-day",
+        name: argument("--design-fixture") == "long"
+          ? "Homemade chicken, roasted vegetables and whole-grain rice bowl with yogurt dressing"
+          : "Chicken rice bowl", serving: "1 meal", calories: energy, values: values, kind: "meal")
+      store.state.customFoods = [sample]
+      for offset in 0..<14 {
+        let date = Calendar.current.date(byAdding: .day, value: -offset, to: store.date)!
+        store.state.days[store.key(date)] = DiaryDay(entries: [
+          DiaryEntry(id: "fixture-entry-\(offset)", foodId: sample.id, quantity: 1, meal: "Lunch")
+        ])
+      }
+      store.state.chatHistory = [
+        NativeMessage(
+          role: "user", content: "I ate a grilled cheese with bread, cheddar and butter."),
+        NativeMessage(role: "assistant", content: "Your meal is ready to review."),
+      ]
+      store.state.pendingMeal = ingredients
+      if ["reading", "follow"].contains(argument("--design-fixture") ?? "") {
+        store.state.pendingMeal = nil
+        store.state.chatHistory = (1...30).map {
+          NativeMessage(
+            role: "assistant",
+            content:
+              "Earlier message \($0): a saved food conversation that stays in place while you read."
+          )
+        }
+      }
+    }
+  }
+#endif
