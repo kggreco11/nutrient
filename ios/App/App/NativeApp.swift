@@ -1463,15 +1463,10 @@ struct NativeTrends: View {
   @State private var interval = NativeTrendInterval.daily
   @State private var range = 14
   @State private var metric = "score"
-  @State private var selectedDate: Date?
-  var selectedBucket: NativeTrendBucket? {
-    guard let selectedDate else { return nil }
-    return buckets.first { $0.date == interval.start(of: selectedDate) }
-  }
-  var averages: [IntakeAverage] { store.averages(interval: interval, count: range) }
-  var buckets: [NativeTrendBucket] { store.trendBuckets(interval, count: range, metric: metric) }
-  var unit: String { metric == "calories" ? "kcal" : "%" }
+  private var unit: String { metric == "calories" ? "kcal" : "%" }
   var body: some View {
+    let buckets = store.trendBuckets(interval, count: range, metric: metric)
+    let averages = store.averages(interval: interval, count: range)
     FieldList {
       Section {
         Picker(
@@ -1498,28 +1493,12 @@ struct NativeTrends: View {
         if buckets.isEmpty {
           Text("No data for this nutrient yet.").foregroundStyle(Color("FieldSecondary"))
         } else {
-          if let latest = selectedBucket ?? (selectedDate == nil ? buckets.last : nil) {
-            VStack(alignment: .leading, spacing: 6) {
-              Text(periodLabel(latest.date)).font(.subheadline).foregroundStyle(
-                Color("FieldSecondary"))
-              Text("\(number(latest.value)) \(unit)")
-                .font(.system(.largeTitle, design: .default).weight(.semibold))
-                .foregroundStyle(nutrientGreen)
-              Text(
-                metric == "calories"
-                  ? "Target \(number(store.state.calorieTarget)) kcal" : "Target 100%"
-              )
-              .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
-            }.padding(.vertical, 6).frame(minHeight: 112, alignment: .leading)
-              .accessibilityElement(children: .combine)
-          } else if let selectedDate {
-            VStack(alignment: .leading, spacing: 6) {
-              Text(periodLabel(interval.start(of: selectedDate))).font(.subheadline)
-              Text("Not recorded").font(.largeTitle.weight(.semibold))
-            }.padding(.vertical, 6).frame(minHeight: 112, alignment: .leading)
-              .accessibilityElement(children: .combine)
-          }
-          chart.frame(height: 220).padding(.vertical, 10)
+          NativeTrendPlot(
+            buckets: buckets, interval: interval, range: range, metric: metric,
+            calorieTarget: store.state.calorieTarget,
+            rangeStart: store.trendStart(interval, count: range), through: store.date
+          ).id("\(interval.rawValue)-\(range)-\(metric)")
+
         }
       }
       if averages.isEmpty {
@@ -1563,16 +1542,84 @@ struct NativeTrends: View {
       }
 
     }.fieldSurface().fieldTitle("Trends")
-      .sensoryFeedback(.selection, trigger: selectedDate.map { interval.start(of: $0) })
-      .onChange(of: interval) { _, _ in selectedDate = nil }
-      .onChange(of: range) { _, _ in selectedDate = nil }
-      .onChange(of: metric) { _, _ in selectedDate = nil }
-      .onAppear {
-        #if DEBUG
-          if NativeDesignFixture.enabled, let offset = NativeDesignFixture.argument("--inspect-period").flatMap(Int.init),
-            buckets.indices.contains(offset) { selectedDate = buckets[offset].date }
-        #endif
+  }
+  private func periodLabel(_ date: Date) -> String {
+    switch interval {
+    case .daily: return date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+    case .weekly:
+      let end = min(store.date, interval.calendar.date(byAdding: .day, value: 6, to: date)!)
+      return "\(date.formatted(.dateTime.month(.abbreviated).day())) – \(end.formatted(.dateTime.month(.abbreviated).day()))"
+    case .monthly: return date.formatted(.dateTime.month(.wide).year())
+    }
+  }
+}
+struct NativeTrendPlot: View {
+  let buckets: [NativeTrendBucket]
+  let interval: NativeTrendInterval
+  let range: Int
+  let metric: String
+  let calorieTarget: Double
+  let rangeStart: Date
+  let through: Date
+  @State private var selection: NativeTrendSelection
+  init(buckets: [NativeTrendBucket], interval: NativeTrendInterval, range: Int,
+       metric: String, calorieTarget: Double, rangeStart: Date, through: Date) {
+    self.buckets = buckets
+    self.interval = interval
+    self.range = range
+    self.metric = metric
+    self.calorieTarget = calorieTarget
+    self.rangeStart = rangeStart
+    self.through = through
+    _selection = State(initialValue: NativeTrendSelection(interval: interval, buckets: buckets))
+  }
+  private var unit: String { metric == "calories" ? "kcal" : "%" }
+  private var selectedDate: Date? { selection.date }
+  private var selectionBinding: Binding<Date?> {
+    Binding(get: { selection.date }, set: { rawDate in
+      // Do not publish another view update for movement within the same period.
+      guard selection.period(for: rawDate) != selection.date else { return }
+      selection.select(rawDate)
+    })
+  }
+  var body: some View {
+    Group {
+      if let latest = selection.bucket ?? (selection.date == nil ? buckets.last : nil) {
+        VStack(alignment: .leading, spacing: 6) {
+          Text(periodLabel(latest.date)).font(.subheadline).foregroundStyle(
+            Color("FieldSecondary"))
+          Text("\(number(latest.value)) \(unit)")
+            .font(.system(.largeTitle, design: .default).weight(.semibold))
+            .foregroundStyle(nutrientGreen)
+          Text(
+            metric == "calories"
+              ? "Target \(number(calorieTarget)) kcal" : "Target 100%"
+          )
+          .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+        }.padding(.vertical, 6).frame(minHeight: 112, alignment: .leading)
+          .accessibilityElement(children: .combine)
+      } else if let selectedDate = selection.date {
+        VStack(alignment: .leading, spacing: 6) {
+          Text(periodLabel(selectedDate)).font(.subheadline)
+          Text("Not recorded").font(.largeTitle.weight(.semibold))
+        }.padding(.vertical, 6).frame(minHeight: 112, alignment: .leading)
+          .accessibilityElement(children: .combine)
       }
+      chart.frame(height: 220).padding(.vertical, 10)
+    }
+    .sensoryFeedback(.selection, trigger: selection.date)
+    .onChange(of: buckets) { _, updated in
+      let previous = selection.date
+      selection = NativeTrendSelection(interval: interval, buckets: updated)
+      selection.select(previous)
+    }
+    .onAppear {
+      #if DEBUG
+        if NativeDesignFixture.enabled,
+          let offset = NativeDesignFixture.argument("--inspect-period").flatMap(Int.init),
+          buckets.indices.contains(offset) { selection.select(buckets[offset].date) }
+      #endif
+    }
   }
   private var chart: some View {
     Chart {
@@ -1593,18 +1640,18 @@ struct NativeTrends: View {
         RuleMark(x: .value("Selected period", interval.start(of: selectedDate)))
           .foregroundStyle(Color("FieldInk").opacity(0.45)).lineStyle(StrokeStyle(lineWidth: 1))
       }
-      RuleMark(y: .value("Target", metric == "calories" ? store.state.calorieTarget : 100))
+      RuleMark(y: .value("Target", metric == "calories" ? calorieTarget : 100))
         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4])).foregroundStyle(Color("FieldSecondary"))
     }.chartForegroundStyleScale(["Food": nutrientGreen, "Supplements": calorieAccent])
-      .chartXSelection(value: $selectedDate)
+      .chartXSelection(value: selectionBinding)
       .chartGesture { proxy in
         DragGesture(minimumDistance: 0)
           .onChanged { proxy.selectXValue(at: $0.location.x) }
       }
       .accessibilityHint("Touch and drag to inspect a period. Exact values are also available below.")
       .chartXScale(
-        domain: store.trendStart(interval, count: range)...interval.calendar.date(
-          byAdding: interval.component, value: 1, to: interval.start(of: store.date))!,
+        domain: rangeStart...interval.calendar.date(
+          byAdding: interval.component, value: 1, to: interval.start(of: through))!,
         range: .plotDimension(padding: 16)
       )
       .chartXAxis {
@@ -1619,7 +1666,7 @@ struct NativeTrends: View {
   }
   private var axisDates: [Date] {
     let step = max(1, Int(ceil(Double(range) / 5)))
-    let first = store.trendStart(interval, count: range)
+    let first = rangeStart
     return stride(from: 0, to: range, by: step).compactMap {
       interval.calendar.date(byAdding: interval.component, value: $0, to: first)
     }
@@ -1628,7 +1675,7 @@ struct NativeTrends: View {
     switch interval {
     case .daily: return date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
     case .weekly:
-      let end = min(store.date, interval.calendar.date(byAdding: .day, value: 6, to: date)!)
+      let end = min(through, interval.calendar.date(byAdding: .day, value: 6, to: date)!)
       return
         "\(date.formatted(.dateTime.month(.abbreviated).day())) – \(end.formatted(.dateTime.month(.abbreviated).day()))"
     case .monthly: return date.formatted(.dateTime.month(.wide).year())

@@ -138,12 +138,30 @@ struct IntakeAverage: Identifiable {
   var percentage: Double { target > 0 ? value / target * 100 : 0 }
   var gap: Double { max(0, target - value) }
 }
-struct NativeTrendBucket: Identifiable {
+struct NativeTrendBucket: Identifiable, Equatable {
   let date: Date
   let value: Double
   let foodOnly: Double
   let days: Int
   var id: Date { date }
+}
+// Immutable bucket lookup and period-level selection keep scrubbing independent of diary aggregation.
+struct NativeTrendSelection {
+  let interval: NativeTrendInterval
+  private let byDate: [Date: NativeTrendBucket]
+  private(set) var date: Date?
+  init(interval: NativeTrendInterval, buckets: [NativeTrendBucket]) {
+    self.interval = interval
+    byDate = Dictionary(uniqueKeysWithValues: buckets.map { ($0.date, $0) })
+  }
+  var bucket: NativeTrendBucket? { date.flatMap { byDate[$0] } }
+  func period(for rawDate: Date?) -> Date? { rawDate.map { interval.start(of: $0) } }
+  @discardableResult mutating func select(_ rawDate: Date?) -> Bool {
+    let next = period(for: rawDate)
+    guard next != date else { return false }
+    date = next
+    return true
+  }
 }
 enum NativeTrendInterval: String, CaseIterable, Identifiable {
   case daily = "Daily", weekly = "Weekly", monthly = "Monthly"

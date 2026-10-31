@@ -23,6 +23,33 @@ import UIKit
     precondition(NativeChatFollow.shouldScroll(userInitiated: false, nearBottom: true))
     precondition(NativeChatFollow.shouldScroll(userInitiated: true, nearBottom: false))
     print("Calorie balance and chat follow-intent checks passed")
+    for interval in NativeTrendInterval.allCases {
+      let first = interval.start(of: Date(timeIntervalSince1970: 1767225600))
+      let missing = interval.calendar.date(byAdding: interval.component, value: 1, to: first)!
+      let last = interval.calendar.date(byAdding: interval.component, value: 2, to: first)!
+      var selection = NativeTrendSelection(interval: interval, buckets: [
+        NativeTrendBucket(date: first, value: 0, foodOnly: 0, days: 1),
+        NativeTrendBucket(date: last, value: 75, foodOnly: 60, days: 1),
+      ])
+      precondition(selection.select(first.addingTimeInterval(60)))
+      precondition(selection.bucket?.value == 0, "Recorded zero must remain inspectable")
+      precondition(!selection.select(first.addingTimeInterval(120)), "Movement within one period must not publish another selection")
+      precondition(selection.select(missing) && selection.bucket == nil, "Missing periods must stay unknown")
+      precondition(selection.select(last) && selection.bucket?.value == 75)
+      precondition(selection.select(nil) && selection.date == nil)
+    }
+    var scrub = NativeTrendSelection(interval: .daily, buckets: [])
+    let scrubStart = Date()
+    var changed = 0
+    let sample = NativeTrendInterval.daily.start(of: scrubStart)
+    for offset in 0..<10000 {
+      let rawDate = sample.addingTimeInterval(Double(offset % 3600))
+      if scrub.period(for: rawDate) != scrub.date, scrub.select(rawDate) { changed += 1 }
+    }
+    let scrubMS = Date().timeIntervalSince(scrubStart) * 1000 / 10000
+    precondition(changed == 1, "Scrubbing within a day should publish only one selection")
+    precondition(scrubMS < 8, "Selection lookup exceeded the interaction-work budget")
+    print("Chart selection: \(String(format: "%.4f", scrubMS)) ms/update; 10,000 within-day samples publish once")
     let seedURL = URL(fileURLWithPath: CommandLine.arguments[1])
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
