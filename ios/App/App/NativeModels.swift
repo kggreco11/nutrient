@@ -168,12 +168,11 @@ enum NativeTrendInterval: String, CaseIterable, Identifiable {
   func start(of date: Date) -> Date { calendar.dateInterval(of: component, for: date)!.start }
 }
 let nativeMeals = ["Breakfast", "Lunch", "Dinner", "Snacks", "Supplements"]
-let nutrientGreen = Color(
-  uiColor: UIColor { traits in
-    traits.userInterfaceStyle == .dark
-      ? UIColor(red: 0.72, green: 0.84, blue: 0.60, alpha: 1)
-      : UIColor(red: 0.29, green: 0.39, blue: 0.23, alpha: 1)
-  })
+let nutrientGreen = Color(uiColor: UIColor(named: "FieldFern") ?? UIColor { traits in
+  traits.userInterfaceStyle == .dark
+    ? UIColor(red: 177/255, green: 216/255, blue: 186/255, alpha: 1)
+    : UIColor(red: 54/255, green: 95/255, blue: 77/255, alpha: 1)
+})
 let nutrientOnGreen = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? .black : .white })
 func number(_ value: Double) -> String {
   value.formatted(.number.precision(.fractionLength(0...(value < 10 ? 1 : 0))))

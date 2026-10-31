@@ -1,0 +1,122 @@
+[
+  {
+    "mode": "light",
+    "foreground": "FieldInk",
+    "background": "FieldSurface",
+    "ratio": 12.62
+  },
+  {
+    "mode": "light",
+    "foreground": "FieldInk",
+    "background": "FieldBackground",
+    "ratio": 11.66
+  },
+  {
+    "mode": "light",
+    "foreground": "FieldSecondary",
+    "background": "FieldSurface",
+    "ratio": 6.03
+  },
+  {
+    "mode": "light",
+    "foreground": "FieldSecondary",
+    "background": "FieldBackground",
+    "ratio": 5.57
+  },
+  {
+    "mode": "light",
+    "foreground": "FieldFern",
+    "background": "FieldSurface",
+    "ratio": 7.09
+  },
+  {
+    "mode": "light",
+    "foreground": "FieldFern",
+    "background": "FieldBackground",
+    "ratio": 6.55
+  },
+  {
+    "mode": "light",
+    "foreground": "FieldOchre",
+    "background": "FieldSurface",
+    "ratio": 5.77
+  },
+  {
+    "mode": "light",
+    "foreground": "FieldOchre",
+    "background": "FieldBackground",
+    "ratio": 5.33
+  },
+  {
+    "mode": "light",
+    "foreground": "FieldError",
+    "background": "FieldSurface",
+    "ratio": 7.11
+  },
+  {
+    "mode": "light",
+    "foreground": "FieldError",
+    "background": "FieldBackground",
+    "ratio": 6.57
+  },
+  {
+    "mode": "dark",
+    "foreground": "FieldInk",
+    "background": "FieldSurface",
+    "ratio": 12.78
+  },
+  {
+    "mode": "dark",
+    "foreground": "FieldInk",
+    "background": "FieldBackground",
+    "ratio": 15.23
+  },
+  {
+    "mode": "dark",
+    "foreground": "FieldSecondary",
+    "background": "FieldSurface",
+    "ratio": 8.38
+  },
+  {
+    "mode": "dark",
+    "foreground": "FieldSecondary",
+    "background": "FieldBackground",
+    "ratio": 9.99
+  },
+  {
+    "mode": "dark",
+    "foreground": "FieldFern",
+    "background": "FieldSurface",
+    "ratio": 9.01
+  },
+  {
+    "mode": "dark",
+    "foreground": "FieldFern",
+    "background": "FieldBackground",
+    "ratio": 10.74
+  },
+  {
+    "mode": "dark",
+    "foreground": "FieldOchre",
+    "background": "FieldSurface",
+    "ratio": 8.3
+  },
+  {
+    "mode": "dark",
+    "foreground": "FieldOchre",
+    "background": "FieldBackground",
+    "ratio": 9.89
+  },
+  {
+    "mode": "dark",
+    "foreground": "FieldError",
+    "background": "FieldSurface",
+    "ratio": 8.35
+  },
+  {
+    "mode": "dark",
+    "foreground": "FieldError",
+    "background": "FieldBackground",
+    "ratio": 9.96
+  }
+]

@@ -134,3 +134,17 @@ Native checks require Xcode and a booted iOS simulator. The Swift test script cu
 Some unused Capacitor migration files remain in the repository. The active iOS target runs SwiftUI directly and does not link the Capacitor runtime.
 
 Issues and pull requests are welcome. Include reproduction steps for bugs, keep unknown nutrition distinct from zero, and keep provider credentials out of client code and commits.
+
+## iPhone design directions
+
+The [design review](design/2026-10-31/research.md) compares three directions inspired by Kevin’s [photography](https://kevingreco.me/photography): **Field**, **Slate**, and **Golden**. Field is implemented in the native SwiftUI app, with light/dark colors, short serif titles, readable food rows, direct Library navigation, nutrient filters, and a fixed meal confirmation action.
+
+![Three iPhone design directions](design/2026-10-31/personal-directions.jpg)
+
+The interactive review includes 22 screen states for each direction. Run it locally:
+
+```sh
+python3 -m http.server 5188 --bind 127.0.0.1 --directory design/2026-10-31
+```
+
+Open `http://127.0.0.1:5188/`. The HTML files are design-review artifacts; the shipping iOS UI is SwiftUI. See the [verification record](design/2026-10-31/verification.md) for the checks performed and remaining device checks.
