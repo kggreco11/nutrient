@@ -220,6 +220,7 @@ struct NativeDayContext: Encodable {
   @Published var date = Date()
   @Published var showingChat = false
   @Published var database: [NativeFood] = []
+  @Published private(set) var logRevision = 0
   @Published var sending = false
   @Published var chatError: String?
   @Published var databaseError: String?
@@ -467,6 +468,7 @@ struct NativeDayContext: Encodable {
     state.days[key(date)] = d
     state.pendingMeal = nil
     save()
+    logRevision += 1
   }
   func remove(_ entry: DiaryEntry) {
     var d = day

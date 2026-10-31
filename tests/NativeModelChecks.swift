@@ -55,7 +55,12 @@ import UIKit
     let roundtrip = try JSONDecoder().decode(NativeFood.self, from: JSONEncoder().encode(measured))
     precondition(roundtrip.portions?.first?.grams == 160 && roundtrip.servingGrams == 160)
     print("Mass conversion, food-specific measures, label weights and portion persistence passed")
+    let revision = store.logRevision
+    store.log([], meal: "Breakfast")
+    store.log([MealItem(food: food, quantity: 0)], meal: "Breakfast")
+    precondition(store.logRevision == revision, "Rejected logs must not trigger success feedback")
     store.log([MealItem(food: food, quantity: 1)], meal: "Breakfast")
+    precondition(store.logRevision == revision + 1, "A committed meal emits one success event")
     let entry = store.day.entries[0]
     try store.updateEntry(entry, from: start, to: start, quantity: 2, meal: "Lunch")
     precondition(

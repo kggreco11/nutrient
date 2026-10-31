@@ -154,3 +154,5 @@ The [latest layout review](design/2026-10-31/navigation-notes.md) compares **Jou
 ![Three tab-free layout directions](design/2026-10-31/navigation-comparison.jpg)
 
 The [native polish pass](design/2026-10-31/audit/fixes.md) addresses all eight design-audit findings: compact progress and ingredient review, earlier trend priorities, adaptive text layouts, respectful chat scrolling, clearer food search, and explicit calorie-overage wording.
+
+The [native interaction pass](design/2026-10-31/interactions.md) adds animated progress updates, meal-log and scanner feedback, scrubbable trend readouts, and live portion previews.

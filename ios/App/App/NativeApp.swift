@@ -51,6 +51,10 @@ struct NutrientAppView: View {
               store.state.chatHistory = store.history + [NativeMessage(
                 role: "assistant", content: "New assistant response at the end of the conversation.")]
             }
+            if NativeDesignFixture.argument("--design-fixture") == "motion" {
+              try? await Task.sleep(for: .seconds(2))
+              store.log(NativeDesignFixture.ingredients, meal: "Dinner")
+            }
             return
           }
         #endif
@@ -144,6 +148,7 @@ struct FieldForm<Content: View>: View {
   }
 }
 struct DashboardRing: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
   let title: String
   let value: Double
@@ -157,6 +162,7 @@ struct DashboardRing: View {
       Text(title).font(.subheadline.weight(.semibold))
       if typeSize.isAccessibilitySize {
         Text("\(number(value)) \(unit)").font(.title.weight(.semibold))
+          .contentTransition(.numericText(value: value))
           .fixedSize(horizontal: false, vertical: true)
         ProgressView(value: fraction).tint(color)
       } else {
@@ -167,6 +173,7 @@ struct DashboardRing: View {
           ).rotationEffect(.degrees(-90))
           VStack(spacing: 2) {
             Text(number(value)).font(.title2.weight(.semibold))
+              .contentTransition(.numericText(value: value))
             Text(unit).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
           }
         }.frame(width: 100, height: 100)
@@ -176,9 +183,11 @@ struct DashboardRing: View {
     }.multilineTextAlignment(.center).frame(maxWidth: .infinity)
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("\(title), \(number(value)) \(unit), \(detail)")
+      .animation(reduceMotion ? nil : .easeInOut(duration: 0.45).delay(0.28), value: value)
   }
 }
 struct NativeToday: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
   @EnvironmentObject var store: NutrientStore
   @State private var add = false
@@ -233,14 +242,21 @@ struct NativeToday: View {
                 } label: {
                   VStack(alignment: .leading, spacing: FieldSpace.item) {
                     FieldValuePair {
-                      Text(id == "carbs" ? "Carbs" : id.capitalized).font(
-                        .subheadline.weight(.semibold))
+                      HStack(spacing: FieldSpace.tight) {
+                        Text(id == "carbs" ? "Carbs" : id.capitalized)
+                        if value >= target {
+                          Image(systemName: "checkmark").font(.caption.weight(.semibold))
+                            .foregroundStyle(nutrientGreen).accessibilityHidden(true)
+                        }
+                      }.font(.subheadline.weight(.semibold))
                     } trailing: {
                       Text("\(number(value)) / \(number(target)) g")
                         .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+                        .contentTransition(.numericText(value: value))
                     }
                     ProgressView(value: min(value / target, 1)).tint(nutrientGreen)
                   }.frame(minHeight: FieldSpace.row).contentShape(Rectangle())
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.45).delay(0.28), value: value)
                 }.buttonStyle(.plain).foregroundStyle(.primary)
                   .accessibilityHint("See contributing foods")
               }
@@ -269,6 +285,7 @@ struct NativeToday: View {
       }.listSectionSpacing(FieldSpace.inset)
         .contentMargins(.top, FieldSpace.item, for: .scrollContent)
         .fieldSurface().fieldTitle("Today")
+        .sensoryFeedback(.success, trigger: store.logRevision)
         .onAppear { store.date = Date() }
         .toolbar {
           ToolbarItem(placement: .topBarLeading) {
@@ -1129,6 +1146,7 @@ struct NativeQuantityInput: View {
   }
 }
 struct NativeMealReview: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @EnvironmentObject var store: NutrientStore
   @Environment(\.dismiss) var dismiss
   @State var items: [MealItem]
@@ -1150,10 +1168,24 @@ struct NativeMealReview: View {
             DisclosureGroup(
               isExpanded: Binding(
                 get: { expandedItem == item.id },
-                set: { expandedItem = $0 ? item.id : nil }
+                set: { opened in
+                  withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                    expandedItem = opened ? item.id : nil
+                  }
+                }
               )
             ) {
               NativeQuantityInput(food: item.food, quantity: $item.quantity)
+              let macros = [("protein", "protein"), ("carbs", "carbs"), ("fat", "fat")].compactMap { id, label -> String? in
+                guard let value = item.food.values[id] ?? nil else { return nil }
+                return "\(number(value * item.quantity)) g \(label)"
+              }
+              if !macros.isEmpty {
+                Text(macros.joined(separator: " · ")).font(.subheadline)
+                  .foregroundStyle(Color("FieldSecondary"))
+                  .contentTransition(.numericText())
+                  .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: item.quantity)
+              }
               if let source = item.food.source {
                 Text(source).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
               }
@@ -1173,6 +1205,8 @@ struct NativeMealReview: View {
                   Text(
                     item.food.energyUnreported == true
                       ? "Energy unreported" : "\(number(item.food.calories * item.quantity)) kcal")
+                    .contentTransition(.numericText(value: item.food.calories * item.quantity))
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: item.quantity)
                 }.font(.subheadline).foregroundStyle(Color("FieldSecondary"))
               }.frame(minHeight: FieldSpace.row, alignment: .leading)
             }
@@ -1335,6 +1369,7 @@ struct FoodRow: View {
   }
 }
 struct NativeScanSheet: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @EnvironmentObject var store: NutrientStore
   @Environment(\.dismiss) var dismiss
   var selected: ((NativeFood) -> Void)? = nil
@@ -1344,13 +1379,16 @@ struct NativeScanSheet: View {
   @State private var status: String?
   @State private var loading = false
   @State private var product: NativeFood?
+  @State private var recognition = 0
+  @State private var captured = false
   var body: some View {
     NavigationStack {
       VStack(spacing: 16) {
         if camera {
           NativeScanner(
             scanned: { code in
-              camera = false
+              captured = true
+              recognition += 1
               self.code = code
               Task { await lookup() }
             },
@@ -1359,6 +1397,22 @@ struct NativeScanSheet: View {
               camera = false
             }
           ).clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay {
+              RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(captured ? nutrientGreen : .white.opacity(0.85), lineWidth: captured ? 3 : 1)
+                .padding(24)
+                .overlay(alignment: .bottom) {
+                  if captured {
+                    Label("Barcode captured", systemImage: "checkmark")
+                      .font(.subheadline.weight(.semibold)).padding(10)
+                      .foregroundStyle(nutrientOnGreen).background(nutrientGreen, in: Capsule())
+                      .padding(.bottom, 32)
+                  }
+                }
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: captured)
+                .allowsHitTesting(false).accessibilityHidden(true)
+            }
+            .accessibilityLabel(captured ? "Barcode captured" : "Barcode camera")
         }
         if loading { ProgressView("Looking up product…") }
         if let status { Text(status).foregroundStyle(Color("FieldSecondary")) }
@@ -1366,6 +1420,7 @@ struct NativeScanSheet: View {
           Button("Scan barcode", systemImage: "barcode.viewfinder") {
             code = ""
             status = nil
+            captured = false
             camera = true
           }
         }
@@ -1375,6 +1430,7 @@ struct NativeScanSheet: View {
         }
         Spacer(minLength: 0)
       }.padding().background(Color("FieldBackground")).navigationTitle("Scan barcode")
+        .sensoryFeedback(.impact(weight: .light), trigger: recognition)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
         .sheet(item: $product, onDismiss: { if logged { dismiss() } }) { food in
@@ -1389,6 +1445,7 @@ struct NativeScanSheet: View {
     defer { loading = false }
     do {
       let food = try await store.backend.barcode(code)
+      camera = false
       if let selected {
         selected(food)
         dismiss()
@@ -1396,6 +1453,7 @@ struct NativeScanSheet: View {
         product = food
       }
     } catch {
+      camera = false
       status = error.localizedDescription
     }
   }
@@ -1405,6 +1463,11 @@ struct NativeTrends: View {
   @State private var interval = NativeTrendInterval.daily
   @State private var range = 14
   @State private var metric = "score"
+  @State private var selectedDate: Date?
+  var selectedBucket: NativeTrendBucket? {
+    guard let selectedDate else { return nil }
+    return buckets.first { $0.date == interval.start(of: selectedDate) }
+  }
   var averages: [IntakeAverage] { store.averages(interval: interval, count: range) }
   var buckets: [NativeTrendBucket] { store.trendBuckets(interval, count: range, metric: metric) }
   var unit: String { metric == "calories" ? "kcal" : "%" }
@@ -1435,7 +1498,7 @@ struct NativeTrends: View {
         if buckets.isEmpty {
           Text("No data for this nutrient yet.").foregroundStyle(Color("FieldSecondary"))
         } else {
-          if let latest = buckets.last {
+          if let latest = selectedBucket ?? (selectedDate == nil ? buckets.last : nil) {
             VStack(alignment: .leading, spacing: 6) {
               Text(periodLabel(latest.date)).font(.subheadline).foregroundStyle(
                 Color("FieldSecondary"))
@@ -1447,7 +1510,14 @@ struct NativeTrends: View {
                   ? "Target \(number(store.state.calorieTarget)) kcal" : "Target 100%"
               )
               .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
-            }.padding(.vertical, 6).accessibilityElement(children: .combine)
+            }.padding(.vertical, 6).frame(minHeight: 112, alignment: .leading)
+              .accessibilityElement(children: .combine)
+          } else if let selectedDate {
+            VStack(alignment: .leading, spacing: 6) {
+              Text(periodLabel(interval.start(of: selectedDate))).font(.subheadline)
+              Text("Not recorded").font(.largeTitle.weight(.semibold))
+            }.padding(.vertical, 6).frame(minHeight: 112, alignment: .leading)
+              .accessibilityElement(children: .combine)
           }
           chart.frame(height: 220).padding(.vertical, 10)
         }
@@ -1493,6 +1563,16 @@ struct NativeTrends: View {
       }
 
     }.fieldSurface().fieldTitle("Trends")
+      .sensoryFeedback(.selection, trigger: selectedDate.map { interval.start(of: $0) })
+      .onChange(of: interval) { _, _ in selectedDate = nil }
+      .onChange(of: range) { _, _ in selectedDate = nil }
+      .onChange(of: metric) { _, _ in selectedDate = nil }
+      .onAppear {
+        #if DEBUG
+          if NativeDesignFixture.enabled, let offset = NativeDesignFixture.argument("--inspect-period").flatMap(Int.init),
+            buckets.indices.contains(offset) { selectedDate = buckets[offset].date }
+        #endif
+      }
   }
   private var chart: some View {
     Chart {
@@ -1509,9 +1589,19 @@ struct NativeTrends: View {
         )
         .foregroundStyle(by: .value("Source", "Supplements"))
       }
+      if let selectedDate {
+        RuleMark(x: .value("Selected period", interval.start(of: selectedDate)))
+          .foregroundStyle(Color("FieldInk").opacity(0.45)).lineStyle(StrokeStyle(lineWidth: 1))
+      }
       RuleMark(y: .value("Target", metric == "calories" ? store.state.calorieTarget : 100))
         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4])).foregroundStyle(Color("FieldSecondary"))
     }.chartForegroundStyleScale(["Food": nutrientGreen, "Supplements": calorieAccent])
+      .chartXSelection(value: $selectedDate)
+      .chartGesture { proxy in
+        DragGesture(minimumDistance: 0)
+          .onChanged { proxy.selectXValue(at: $0.location.x) }
+      }
+      .accessibilityHint("Touch and drag to inspect a period. Exact values are also available below.")
       .chartXScale(
         domain: store.trendStart(interval, count: range)...interval.calendar.date(
           byAdding: interval.component, value: 1, to: interval.start(of: store.date))!,
