@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { runAgent, validateProposal } from "../server/agent.js";
 import { handleApi } from "../server/http.js";
 import { DEFAULT_MODEL, PINNED_PROVIDER } from "../server/policy.js";
-import { foods, nutrients } from "../app/data.js";
+import { foods, nutrients } from "../shared/data.js";
 const call = (name, args) => ({
   id: crypto.randomUUID(),
   type: "function",

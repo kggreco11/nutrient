@@ -2,8 +2,8 @@ import { writeFileSync, copyFileSync } from "node:fs";
 import {
   personalCalorieTarget,
   personalSupplements,
-} from "../app/personal-plan.js";
-import { nutrients, foods, defaultTargets } from "../app/data.js";
+} from "../shared/personal-plan.js";
+import { nutrients, foods, defaultTargets } from "../shared/data.js";
 writeFileSync(
   new URL("../ios/App/App/NativeSeed.json", import.meta.url),
   JSON.stringify({
@@ -15,7 +15,7 @@ writeFileSync(
   }),
 );
 copyFileSync(
-  new URL("../public/data/usda-sr-legacy.json", import.meta.url),
+  new URL("../data/usda-sr-legacy.json", import.meta.url),
   new URL("../ios/App/App/FoodDatabase.json", import.meta.url),
 );
 console.log(

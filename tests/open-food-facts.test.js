@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { productToFood } from "../app/open-food-facts.js";
+import { productToFood } from "../shared/open-food-facts.js";
 test("barcode data converts standardized grams into displayed micronutrient units", () => {
   const f = productToFood(
     {

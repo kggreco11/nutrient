@@ -1,20 +1,3 @@
-let databasePromise;
-export function loadFoodDatabase() {
-  return (databasePromise ??= fetch(
-    import.meta.env.BASE_URL + "data/usda-sr-legacy.json",
-  )
-    .then((r) => {
-      if (!r.ok)
-        throw Error(
-          "The offline food database could not be loaded. Please retry.",
-        );
-      return r.json();
-    })
-    .catch((e) => {
-      databasePromise = null;
-      throw e;
-    }));
-}
 export function searchDatabase(
   foods,
   query,

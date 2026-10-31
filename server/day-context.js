@@ -1,4 +1,4 @@
-import { nutrients } from "../app/data.js";
+import { nutrients } from "../shared/data.js";
 const finite = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0;
 const invalid = () =>
   Object.assign(Error("Invalid selected-day nutrition context."), {

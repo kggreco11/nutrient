@@ -39,7 +39,7 @@ for f in rows('food'):
  n['omega3']=round(sum(omega),6) if all(x is not None for x in omega) else None
  result.append({'id':'usda-'+f['fdc_id'],'name':f['description'],'serving':'100 g','emoji':'◈','calories':v[1008],'values':n,'kind':'food','source':'USDA SR Legacy','sourceId':f['fdc_id'],'restaurant':f['food_category_id']=='21','servingGrams':100,'portions':portions.get(f['fdc_id'],[])})
 result.sort(key=lambda f:f['name'].lower())
-out=Path(__file__).resolve().parents[1]/'public/data';out.mkdir(parents=True,exist_ok=True)
+out=Path(__file__).resolve().parents[1]/'data';out.mkdir(parents=True,exist_ok=True)
 (out/'usda-sr-legacy.json').write_text(json.dumps(result,separators=(',',':')))
 (out/'usda-manifest.json').write_text(json.dumps({'source':'USDA FoodData Central / SR Legacy','release':'April 2018 (final SR release)','publicationDate':'2019-04-01','downloadUrl':URL,'sourceSha256':hashlib.sha256(raw).hexdigest(),'foodCount':len(result),'restaurantCount':sum(f['restaurant'] for f in result),'basis':'per 100 g','license':'Public domain / CC0','micronutrients':'Vitamin A as RAE; folate as DFE; vitamin D in micrograms; niacin as NE (measured NE or niacin + tryptophan/60); fluoride converted µg to mg; unavailable fields remain null; omega-3 only when all ALA/EPA/DHA/DPA components are reported'},indent=2)+'\n')
 print(f'Imported {len(result)} foods, including {sum(f["restaurant"] for f in result)} historical fast-food entries.')

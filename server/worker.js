@@ -17,11 +17,7 @@ export default {
     });
     if (api) return api;
     const path = new URL(request.url).pathname;
-    const asset =
-      assets[path] ||
-      (path === "/" || !path.split("/").at(-1).includes(".")
-        ? assets["/index.html"]
-        : null);
+    const asset = assets[path];
     if (!asset) return new Response("Not found", { status: 404 });
     const bytes = decode(asset);
     const acceptsGzip = request.headers

@@ -1,8 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { initialState, nutrients } from "../app/data.js";
-import { migrateReferenceTargets } from "../app/targets.js";
-import { nutrientPatterns } from "../app/trends.js";
+import { initialState, nutrients } from "../shared/data.js";
+import { migrateReferenceTargets } from "../shared/targets.js";
 test("legacy target migration preserves custom treatment targets, macros, history and repeated edits", () => {
   const s = initialState();
   Object.assign(s.targets, {
@@ -27,44 +26,4 @@ test("legacy target migration preserves custom treatment targets, macros, histor
   s.targets.iron = 12;
   assert.equal(migrateReferenceTargets(s), false);
   assert.equal(s.targets.iron, 12);
-});
-test("recorded shortfall patterns distinguish complete, partial, and entirely unknown days", () => {
-  const s = initialState();
-  s.targets.vitD = 15; // Pin this percentage fixture independently of the personal plan.
-  const food = (id, value, partial = false) => ({
-    id,
-    calories: 0,
-    values: Object.fromEntries(
-      nutrients.map((n) => [n.id, n.id === "vitD" ? value : null]),
-    ),
-    partialNutrients: partial ? ["vitD"] : [],
-  });
-  const catalog = [
-    food("known", 5),
-    food("unknown", null),
-    food("partial", 5, true),
-  ];
-  const day = (ids) => ({
-    water: 0,
-    entries: ids.map((foodId, i) => ({
-      id: "real-" + i,
-      foodId,
-      quantity: 1,
-      meal: "Breakfast",
-    })),
-  });
-  s.days = {
-    "2026-10-01": day(["known"]),
-    "2026-10-02": day(["known", "unknown"]),
-    "2026-10-03": day(["partial"]),
-    "2026-10-04": day(["unknown"]),
-  };
-  const record = nutrientPatterns(s, catalog, "2026-10-27", 3).below.find(
-    (n) => n.id === "vitD",
-  );
-  assert.equal(record.knownDays, 3);
-  assert.equal(record.completeDays, 1);
-  assert.equal(record.unreportedDays, 1);
-  assert.equal(record.below, 3);
-  assert.ok(Math.abs(record.average - 100 / 3) < 1e-9);
 });

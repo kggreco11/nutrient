@@ -17,17 +17,18 @@ Log food in plain language, scan a barcode or nutrition label, and see which nut
 - **Daily, weekly, and monthly trends:** individual-day scores, Monday–Sunday weekly averages, and monthly nutrient/calorie averages. Choose a time range and read exact dated values alongside target comparisons.
 - **Local storage:** diary, targets, and library persist on the device, with JSON export/import.
 
-The iPhone interface is written in **SwiftUI**, using native navigation, tabs, forms, camera capture, and charts. A separate Vite web companion shares nutrition data and server modules. Web assets are not embedded in the iOS app.
+The iPhone interface is written in **SwiftUI**, with native navigation, forms, camera capture, and Swift Charts. Xcode builds the app directly. There is no web interface or Capacitor runtime in the active project.
+
+The JavaScript in this repository implements the optional server-side AI backend and shared nutrition-data tooling. It does not render the iPhone interface.
 
 ## Run the iOS app
 
-You need macOS, Xcode with an iOS SDK, and an Apple signing team to run on a physical iPhone. The minimum deployment target is **iOS 17**. Node.js 20.19+ or 22.12+ and npm are used for the shared data/build tooling.
+You need macOS, Xcode with an iOS SDK, and an Apple signing team to run on a physical iPhone. The minimum deployment target is **iOS 17**. Node.js is only needed to work on the backend or regenerate shared nutrition data.
 
 ```sh
 git clone https://github.com/kggreco11/nutrient.git
 cd nutrient
-npm ci
-npm run ios:open
+open ios/App/App.xcodeproj
 ```
 
 In Xcode:
@@ -39,6 +40,7 @@ In Xcode:
 The bundled food data is already checked in. After changing shared food data or target definitions, refresh the native resources with:
 
 ```sh
+npm ci
 npm run ios:sync
 ```
 
@@ -50,32 +52,32 @@ The native app currently points to this project's private hosted backend. Forks 
 
 - Keep `OPENROUTER_API_KEY` on the server.
 - Configure authentication for your deployment. Standalone deployments support a separate `NUTRIENT_API_TOKEN`; the private Sites deployment uses its service-access credential.
-- The app's **More → Settings → Chat connection** stores the service-access credential in iOS Keychain. Use the credential appropriate to your chosen authentication mechanism; it is never the OpenRouter key. Adapt the request authorization header in `NativeBackend.swift` if you use standalone bearer-token authentication instead of Sites.
+- The app's **Today menu → Settings → Chat connection** stores the service-access credential in iOS Keychain. Use the credential appropriate to your chosen authentication mechanism; it is never the OpenRouter key. Adapt the request authorization header in `NativeBackend.swift` if you use standalone bearer-token authentication instead of Sites.
 
 The checked-in Xcode project contains development signing identifiers, not signing certificates or private keys. Camera and microphone features need the corresponding iOS permissions.
 
-## Run the web companion
+## Run the optional backend
+
+Use Node.js 20.19+ and npm. Manual food logging, local nutrient calculations, the library, and Trends run in Swift without this server.
 
 ```sh
 npm ci
 cp .env.example .env.local
+# Set OPENROUTER_API_KEY in .env.local, which is ignored by Git.
 npm run dev
 ```
 
-Open the local URL Vite prints. For AI features, set `OPENROUTER_API_KEY` in `.env.local` and restart the dev server. The file is ignored by Git. Hosted deployments need their own server runtime secrets; local environment files are not uploaded.
+The local API listens only on `127.0.0.1:8787`; its status endpoint is `/api/status`. Set `PORT` to use another port. There is no browser UI. To point a development iOS build at this server, change `origin` in `NativeBackend.swift`; the Simulator can reach the Mac's loopback address. Physical-device development needs a reachable authenticated deployment.
 
-```dotenv
-OPENROUTER_API_KEY=your_key_here
-OPENROUTER_MODEL=deepseek/deepseek-v4.1-flash
-```
+The default model is **DeepSeek V4.1 Flash via OpenRouter**, routed to OpenInference FP4 without a fixed token-price cap. Model selection is configured server-side. Keys stay on the server. Provider usage can incur charges.
 
-The default model is **DeepSeek V4.1 Flash via OpenRouter**, routed to OpenInference FP4 without a fixed token-price cap. Model selection is configured server-side. Model requests and optional web tools incur provider charges; the app does not include API credits.
+Build the hosted API Worker:
 
 ```sh
 npm run build
 ```
 
-This builds `dist/client` for the web companion and `dist/server/index.js` for the hosted Worker. The existing hosting manifest belongs to this project's private deployment; replace it when deploying your own instance.
+This produces `dist/server/index.js`, containing API routes and compressed nutrition data. It includes no web frontend. The hosting manifest belongs to this project's existing private deployment; replace it for your own deployment. Building does not deploy or change the currently hosted backend.
 
 ## How food lookup works
 
@@ -95,7 +97,7 @@ See the [assistant contract](docs/assistant.md), [runtime instructions](server/p
 
 **USDA FoodData Central / SR Legacy** supplies 7,793 bundled food records. Food-specific household measures are available for 7,526 of them. Nutrient values use a 100 g basis; measurement conversions retain the source food's portion weights. Ounces and pounds use exact mass conversions. Volume and item counts need a food-specific weight; the app does not assume every food has water's density. Custom labels can include a serving weight in grams.
 
-The dataset is the final **April 2018 SR Legacy release**, including historical restaurant entries. It is not a live restaurant-menu database. Source details and the archive checksum are in the [data manifest](public/data/usda-manifest.json). Packaged-product lookup uses [Open Food Facts](https://world.openfoodfacts.org/); community records can be incomplete.
+The dataset is the final **April 2018 SR Legacy release**, including historical restaurant entries. It is not a live restaurant-menu database. Source details and the archive checksum are in the [data manifest](data/usda-manifest.json). Packaged-product lookup uses [Open Food Facts](https://world.openfoodfacts.org/); community records can be incomplete.
 
 Rebuild the USDA data with Python 3:
 
@@ -113,9 +115,9 @@ The checked-in targets and supplement examples reflect this project's initial co
 ## Development
 
 ```sh
-npm test                 # JavaScript calculation, data, API, and assistant tests
+npm test                 # Backend, shared-data, and deployment-bundle checks
 npm run test:native      # Swift model, OCR, conversion, persistence, and contrast checks
-npm run build            # Web and hosted backend build
+npm run build            # Hosted API Worker build
 ```
 
 Native checks require Xcode and a booted iOS simulator. The Swift test script currently targets an Apple Silicon simulator.
@@ -127,11 +129,11 @@ Native checks require Xcode and a booted iOS simulator. The Swift test script cu
 | `ios/App/App/NativeCapture.swift` | Barcode camera, label OCR, and dictation |
 | `ios/App/App/NativeBackend.swift` | Native networking and Keychain access |
 | `server/` | Assistant tools, label extraction, selected-day arithmetic, and API routes |
-| `app/` | Web companion and shared data definitions |
-| `public/data/` | Bundled USDA dataset and provenance |
+| `shared/` | Nutrition definitions, target/seed fixtures, database search, and product normalization |
+| `data/` | USDA dataset and provenance used by the backend and native resource sync |
 | `tests/` | JavaScript tests and native model checks |
 
-Some unused Capacitor migration files remain in the repository. The active iOS target runs SwiftUI directly and does not link the Capacitor runtime.
+The earlier web app and Capacitor scaffolding were removed from the active tree. They remain recoverable in Git history before the native-repository cleanup. `design/` contains historical HTML design studies; those are review artifacts and are never shipped in the iOS app or hosted backend.
 
 Issues and pull requests are welcome. Include reproduction steps for bugs, keep unknown nutrition distinct from zero, and keep provider credentials out of client code and commits.
 

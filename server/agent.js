@@ -3,9 +3,9 @@ import {
   evaluateChoices,
   formatFoodChoices,
 } from "./day-context.js";
-import { nutrients } from "../app/data.js";
-import { searchDatabase } from "../app/food-database.js";
-import { lookupBarcode } from "../app/open-food-facts.js";
+import { nutrients } from "../shared/data.js";
+import { searchDatabase } from "../shared/food-database.js";
+import { lookupBarcode } from "../shared/open-food-facts.js";
 import { DEFAULT_MODEL, SYSTEM_PROMPT, PINNED_PROVIDER } from "./policy.js";
 const functionTool = (name, description, properties, required = []) => ({
   type: "function",

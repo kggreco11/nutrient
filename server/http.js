@@ -16,7 +16,7 @@ export async function handleApi(
   if (!url.pathname.startsWith("/api/")) return null;
   const origin = request.headers.get("origin");
   const allowedOrigin =
-    origin === "capacitor://localhost" || origin === url.origin;
+    origin === url.origin;
   const cors = allowedOrigin
     ? {
         "Access-Control-Allow-Origin": origin,

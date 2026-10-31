@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { runAgent } from "../server/agent.js";
-import { defaultTargets, foods } from "../app/data.js";
+import { defaultTargets, foods } from "../shared/data.js";
 const dayContext = {
   date: "2026-10-27",
   calorieTarget: 3500,

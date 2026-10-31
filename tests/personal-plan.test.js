@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { initialState, nutrients } from "../app/data.js";
+import { initialState, nutrients } from "../shared/data.js";
 import {
   migratePersonalTargets,
   personalSupplements,
-} from "../app/personal-plan.js";
+} from "../shared/personal-plan.js";
 test("personal targets replace legacy defaults once while preserving custom values and diary", () => {
   const state = initialState();
   delete state.personalTargetVersion;

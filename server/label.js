@@ -1,4 +1,4 @@
-import { nutrients } from '../app/data.js';
+import { nutrients } from '../shared/data.js';
 import { DEFAULT_MODEL, PINNED_PROVIDER } from './policy.js';
 const fail = (message, status = 422) => Object.assign(new Error(message), { status });
 

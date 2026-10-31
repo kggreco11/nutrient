@@ -1,4 +1,4 @@
-import { nutrients } from "../app/data.js";
+import { nutrients } from "../shared/data.js";
 export const DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash";
 export const PINNED_PROVIDER = {
   only: ["open-inference"],
