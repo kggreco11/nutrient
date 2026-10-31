@@ -381,15 +381,42 @@ struct NativeDayContext: Encodable {
   }
   var day: DiaryDay { state.days[key(date)] ?? DiaryDay() }
   func food(_ id: String) -> NativeFood? { foods.first { $0.id == id } }
+  private func persist() throws {
+    let data = try JSONEncoder().encode(state)
+    try data.write(to: dataURL, options: .atomic)
+    if mirrorPreferences {
+      UserDefaults.standard.set(String(data: data, encoding: .utf8), forKey: "CapacitorStorage.nutrient-v1")
+    }
+  }
   func save() {
-    do {
-      let data = try JSONEncoder().encode(state)
-      try data.write(to: dataURL, options: .atomic)
-      if mirrorPreferences {
-        UserDefaults.standard.set(
-          String(data: data, encoding: .utf8), forKey: "CapacitorStorage.nutrient-v1")
+    do { try persist() }
+    catch { self.error = "Couldn't save. Export a backup before closing the app." }
+  }
+  @discardableResult func saveDiaryMeal(_ name: String, entryIDs: Set<String>, from date: Date) throws -> NativeFood {
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    func invalid(_ message: String) -> NSError {
+      NSError(domain: "Nutrient", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+    guard !trimmed.isEmpty else { throw invalid("Give this meal a name.") }
+    let entries = (state.days[key(date)]?.entries ?? []).filter { entryIDs.contains($0.id) }
+    guard !entries.isEmpty && entries.count == entryIDs.count else {
+      throw invalid("Some selected entries changed. Select the foods again.")
+    }
+    let items = try entries.map { entry -> MealItem in
+      guard let food = food(entry.foodId), !food.isSupplement,
+        entry.quantity.isFinite && entry.quantity > 0 && entry.quantity <= 100 else {
+        throw invalid("Select food entries with valid amounts to create a meal.")
       }
-    } catch { self.error = "Couldn't save. Export a backup before closing the app." }
+      return MealItem(food: food, quantity: entry.quantity)
+    }
+    let meal = composite(trimmed, items: items)
+    state.customFoods.append(meal)
+    do { try persist() }
+    catch {
+      state.customFoods.removeAll { $0.id == meal.id }
+      throw invalid("Couldn't save this meal. Try again.")
+    }
+    return meal
   }
   func total(_ nutrient: String, entries: [DiaryEntry]? = nil) -> Double {
     (entries ?? day.entries).reduce(0) { sum, e in

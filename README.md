@@ -13,7 +13,7 @@ Log food in plain language, scan a barcode or nutrition label, and see which nut
 - **Barcode scanning:** native camera lookup of packaged foods through Open Food Facts. Scan successive ingredients into one meal draft, adjust each portion, and log them together as a named meal. Mix scans with database foods and optionally save the meal for reuse.
 - **Nutrition-label photos:** photograph a Nutrition Facts panel or choose an existing photo to prefill a custom food. Review the extracted serving, calories, and nutrient amounts before saving.
 - **Measurement conversion:** enter grams, ounces, pounds, kilograms, or available food-specific measures such as cups, tablespoons, slices, and pieces. See the gram equivalent while calories and nutrients update.
-- **Reusable library:** save custom foods, meals, and supplements. Edit diary entries and portions; archive library items while keeping historical entries intact.
+- **Reusable library:** save custom foods, meals, and supplements. Select existing diary entries to save a meal with their logged portions. Edit diary entries and portions; archive library items while keeping historical entries intact.
 - **Daily, weekly, and monthly trends:** individual-day scores, Monday–Sunday weekly averages, and monthly nutrient/calorie averages. Choose a time range and read exact dated values alongside target comparisons.
 - **Local storage:** diary, targets, and library persist on the device, with JSON export/import.
 

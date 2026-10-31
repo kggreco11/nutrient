@@ -405,38 +405,140 @@ struct NativeEntryEditor: View {
     }
   }
 }
+struct NativeDiaryMealDraft: Identifiable {
+  let id = UUID()
+  let date: Date
+  let entryIDs: Set<String>
+  let items: [MealItem]
+}
+struct NativeDiaryMealSave: View {
+  @EnvironmentObject var store: NutrientStore
+  @Environment(\.dismiss) var dismiss
+  let draft: NativeDiaryMealDraft
+  var saved: () -> Void
+  @State private var name = ""
+  @State private var error: String?
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          TextField("Meal name", text: $name).textInputAutocapitalization(.sentences)
+        }
+        Section("Ingredients") {
+          ForEach(draft.items) { item in
+            VStack(alignment: .leading, spacing: 5) {
+              Text(item.food.name)
+              Text("\(item.quantity.formatted(.number.precision(.fractionLength(0...3)))) × \(item.food.serving)")
+                .font(.subheadline).foregroundStyle(.secondary)
+            }
+          }
+          LabeledContent("Energy", value: "\(draft.items.contains { $0.food.energyUnreported == true } ? "≥ " : "")\(number(draft.items.reduce(0) { $0 + $1.food.calories * $1.quantity })) kcal")
+        }
+        if let error { Text(error).foregroundStyle(.red) }
+      }.navigationTitle("Save meal").navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Save") {
+              do {
+                try store.saveDiaryMeal(name, entryIDs: draft.entryIDs, from: draft.date)
+                saved()
+                dismiss()
+              } catch { self.error = error.localizedDescription }
+            }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          }
+        }
+    }.tint(nutrientGreen)
+  }
+}
 struct NativeDiary: View {
   @EnvironmentObject var store: NutrientStore
   @State private var add = false
+  @State private var selecting = false
+  @State private var selectedIDs = Set<String>()
+  @State private var mealDraft: NativeDiaryMealDraft?
+  var selectable: [DiaryEntry] {
+    store.day.entries.filter { store.food($0.foodId).map { !$0.isSupplement } ?? false }
+  }
   var body: some View {
     NavigationStack {
       List {
         DatePicker("Date", selection: $store.date, displayedComponents: .date)
-        NavigationLink {
-          NativeDailyCoverage()
-        } label: {
-          LabeledContent("Nutrient coverage", value: "\(store.dailyGaps.count) still short")
+        if !selecting {
+          NavigationLink { NativeDailyCoverage() } label: {
+            LabeledContent("Nutrient coverage", value: "\(store.dailyGaps.count) still short")
+          }
         }
-
         ForEach(nativeMeals, id: \.self) { meal in
           Section(meal) {
             let entries = store.day.entries.filter { $0.meal == meal }
             if entries.isEmpty { Text("No entries").foregroundStyle(.secondary) }
-            ForEach(entries) { entry in NativeLoggedEntry(entry: entry, sourceDate: store.date) }
-            Button("Add food") { add = true }
+            ForEach(entries) { entry in
+              if selecting {
+                if let food = store.food(entry.foodId) {
+                  Button {
+                    if selectedIDs.contains(entry.id) { selectedIDs.remove(entry.id) }
+                    else { selectedIDs.insert(entry.id) }
+                  } label: {
+                    HStack(alignment: .top, spacing: 12) {
+                      Image(systemName: selectedIDs.contains(entry.id) ? "checkmark.circle.fill" : "circle")
+                        .font(.title2).foregroundStyle(nutrientGreen)
+                      VStack(alignment: .leading, spacing: 5) {
+                        Text(food.name).foregroundStyle(.primary)
+                        Text("\(entry.quantity.formatted(.number.precision(.fractionLength(0...3)))) × \(food.serving)")
+                          .font(.subheadline).foregroundStyle(.secondary)
+                      }
+                    }.padding(.vertical, 4)
+                  }.buttonStyle(.plain).disabled(food.isSupplement)
+                    .accessibilityLabel("\(selectedIDs.contains(entry.id) ? "Deselect" : "Select") \(food.name)")
+                    .accessibilityAddTraits(selectedIDs.contains(entry.id) ? .isSelected : [])
+                }
+              } else { NativeLoggedEntry(entry: entry, sourceDate: store.date) }
+            }
+            if !selecting { Button("Add food") { add = true } }
           }
         }
       }.scrollIndicators(.hidden).navigationTitle("Diary")
         .toolbar {
+          ToolbarItem(placement: .topBarLeading) {
+            Button(selecting ? "Cancel" : "Select") {
+              selectedIDs.removeAll()
+              selecting.toggle()
+            }.disabled(!selecting && selectable.isEmpty)
+          }
           ToolbarItem(placement: .topBarTrailing) {
-            Button {
-              add = true
-            } label: {
-              Image(systemName: "plus")
-            }.accessibilityLabel("Log food")
+            if selecting {
+              Button(selectedIDs.count == selectable.count ? "Deselect all" : "Select all") {
+                selectedIDs = selectedIDs.count == selectable.count ? [] : Set(selectable.map(\.id))
+              }.disabled(selectable.isEmpty)
+            } else {
+              Button { add = true } label: { Image(systemName: "plus") }.accessibilityLabel("Log food")
+            }
           }
         }
+        .safeAreaInset(edge: .bottom) {
+          if selecting {
+            Button {
+              let entries = selectable.filter { selectedIDs.contains($0.id) }
+              mealDraft = NativeDiaryMealDraft(date: store.date, entryIDs: Set(entries.map(\.id)),
+                items: entries.compactMap { entry in
+                  store.food(entry.foodId).map { MealItem(food: $0, quantity: entry.quantity) }
+                })
+            } label: {
+              Text("Save as meal (\(selectedIDs.count))").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6)
+            }.buttonStyle(.borderedProminent).tint(nutrientGreen)
+              .foregroundStyle(selectedIDs.isEmpty ? Color.secondary : nutrientOnGreen)
+              .disabled(selectedIDs.isEmpty).padding().background(.bar)
+          }
+        }
+        .onChange(of: store.date) { _, _ in selectedIDs.removeAll() }
         .sheet(isPresented: $add) { NativeFoodSearch() }
+        .sheet(item: $mealDraft) { draft in
+          NativeDiaryMealSave(draft: draft, saved: {
+            selecting = false
+            selectedIDs.removeAll()
+          })
+        }
     }
   }
 }

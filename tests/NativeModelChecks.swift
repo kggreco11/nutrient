@@ -187,6 +187,43 @@ import UIKit
     let summary = trendStore.averages(interval: .weekly, count: 2).first { $0.id == "vitC" }!
     precondition(summary.reportedDays == 3 && abs(summary.value - 45) < 0.000001)
     print("Daily, Monday-week and monthly trends passed: year boundaries, unknown/zero, gaps, future/sample exclusion and matching summaries")
+    let diaryStore = NutrientStore(seedURL: seedURL, storageURL: directory.appendingPathComponent("diary-meals.json"), mirrorPreferences: false)
+    let sourceDate = diaryStore.date
+    let sourceKey = diaryStore.key(sourceDate)
+    [bread, cheese, butter].forEach { diaryStore.remember($0) }
+    var diarySupplement = cheese
+    diarySupplement.id = "diary-supplement"; diarySupplement.kind = "supplement"
+    diaryStore.remember(diarySupplement)
+    let selectedBread = DiaryEntry(id: "bread-first", foodId: bread.id, quantity: 0.6, meal: "Lunch")
+    let selectedCheese = DiaryEntry(id: "cheese-first", foodId: cheese.id, quantity: 0.3, meal: "Lunch")
+    let selectedButter = DiaryEntry(id: "butter-first", foodId: butter.id, quantity: 0.1, meal: "Lunch")
+    let otherBread = DiaryEntry(id: "bread-second", foodId: bread.id, quantity: 0.2, meal: "Dinner")
+    let supplementEntry = DiaryEntry(id: "pill", foodId: diarySupplement.id, quantity: 1, meal: "Supplements")
+    diaryStore.state.days = [sourceKey: DiaryDay(entries: [selectedBread, selectedCheese, selectedButter, otherBread, supplementEntry])]
+    diaryStore.date = Calendar.current.date(byAdding: .day, value: 1, to: sourceDate)!
+    let recipe = try diaryStore.saveDiaryMeal("  Grilled cheese  ", entryIDs: [selectedBread.id, selectedCheese.id, selectedButter.id], from: sourceDate)
+    precondition(recipe.name == "Grilled cheese" && recipe.kind == "meal" && recipe.archived != true)
+    precondition(recipe.components?.count == 3 && abs(recipe.calories - 340) < 0.000001 && abs(recipe.value("protein")! - 13.6) < 0.000001)
+    precondition(recipe.partialNutrients?.contains("vitC") == true)
+    let afterDays = diaryStore.state.days[sourceKey]!.entries
+    precondition(afterDays.map { $0.id } == ["bread-first", "cheese-first", "butter-first", "bread-second", "pill"])
+    precondition(afterDays.map { $0.quantity } == [0.6, 0.3, 0.1, 0.2, 1], "Saving to the library must not replace or re-log diary entries")
+    precondition(diaryStore.day.entries.isEmpty, "Saving from an earlier date must not log anything today")
+    let duplicateBreadMeal = try diaryStore.saveDiaryMeal("Two bread entries", entryIDs: [selectedBread.id, otherBread.id], from: sourceDate)
+    precondition(duplicateBreadMeal.components?.count == 2 && abs(duplicateBreadMeal.calories - 200) < 0.000001)
+    let libraryCount = diaryStore.state.customFoods.count
+    for (name, ids) in [("", Set([selectedBread.id])), ("Empty", Set<String>()), ("Missing", Set(["missing"])), ("Supplement", Set([supplementEntry.id]))] {
+      do {
+        try diaryStore.saveDiaryMeal(name, entryIDs: ids, from: sourceDate)
+        preconditionFailure("Invalid selection was accepted")
+      } catch { }
+    }
+    precondition(diaryStore.state.customFoods.count == libraryCount)
+    let reloadedDiary = NutrientStore(seedURL: seedURL, storageURL: directory.appendingPathComponent("diary-meals.json"), mirrorPreferences: false)
+    precondition(reloadedDiary.food(recipe.id)?.components?.count == 3 && reloadedDiary.state.days[sourceKey]?.entries.count == 5)
+    try diaryStore.updateEntry(selectedBread, from: sourceDate, to: sourceDate, quantity: 2, meal: "Lunch")
+    precondition(abs(diaryStore.food(recipe.id)!.calories - 340) < 0.000001, "Saved recipe must snapshot the selected portions")
+    print("Diary selection-to-library passed: logged portions, duplicate foods, historical dates, unchanged diary, validation and persistence")
     for style in [UIUserInterfaceStyle.light, .dark] {
       let traits = UITraitCollection(userInterfaceStyle: style)
       traits.performAsCurrent {
