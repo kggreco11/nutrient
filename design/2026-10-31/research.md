@@ -1,5 +1,7 @@
 # Nutrient: three iPhone design directions
 
+> The navigation in this initial review is superseded by [the tab-free layout revision](navigation-notes.md).
+
 Design review created 31 October 2026. These are interactive visual proposals for the native SwiftUI product; they do not replace the running iOS app with a website.
 
 ## GitHub skill research

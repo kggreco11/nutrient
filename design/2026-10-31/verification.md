@@ -1,5 +1,7 @@
 # Design verification — 31 October 2026
 
+> The navigation in this initial review is superseded by [the tab-free layout revision](navigation-notes.md).
+
 ## Requirement audit
 
 | Requested outcome | Authoritative evidence | Status |

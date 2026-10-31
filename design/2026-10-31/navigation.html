@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Nutrient — three navigation layouts</title>
+    <link rel="stylesheet" href="mockups.css?v=personal-3" />
+    <link rel="stylesheet" href="navigation.css?v=1" />
+  </head>
+  <body>
+    <div id="studio">
+      <header class="studio-head">
+        <div>
+          <small>Nutrient / iOS design review</small>
+          <h1>Three different ways to use it.</h1>
+        </div>
+        <a href="navigation-notes.md">Research & mobile rules</a>
+      </header>
+      <div class="studio-controls">
+        <div id="directions"></div>
+        <label>Screen<select id="screen"></select></label
+        ><label
+          >Appearance<select id="appearance">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select></label
+        ><label
+          >Text<select id="text-size">
+            <option value="1">Standard</option>
+            <option value="1.3">Larger</option>
+            <option value="2">200%</option>
+          </select></label
+        ><label
+          >Phone<select id="phone-width">
+            <option value="393">393 pt</option>
+            <option value="375">375 pt</option>
+            <option value="430">430 pt</option>
+          </select></label
+        ><button id="board">Overview board</button>
+      </div>
+      <section class="direction-copy" id="direction-copy"></section>
+      <main id="canvas"></main>
+      <footer class="studio-foot">
+        Interactive design mockups. Sample food and diary values. The production
+        app remains native SwiftUI.
+      </footer>
+    </div>
+    <script src="mockups.js?v=personal-3"></script>
+    <script src="navigation.js?v=2"></script>
+  </body>
+</html>

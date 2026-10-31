@@ -7,39 +7,21 @@ import UniformTypeIdentifiers
 struct NutrientAppView: View {
   @StateObject private var store = NutrientStore()
   var body: some View {
-    TabView(selection: $store.tab) {
-      NativeToday().tabItem { Label("Today", systemImage: "circle.grid.2x2") }.tag(0)
-      NativeDiary().tabItem { Label("Diary", systemImage: "list.bullet.rectangle") }.tag(1)
-      NativeChat().tabItem { Label("Chat", systemImage: "bubble.left") }.tag(2)
-      NativeTrends().tabItem { Label("Trends", systemImage: "chart.xyaxis.line") }.tag(3)
-      NavigationStack { NativeLibrary() }.tabItem {
-        Label("Library", systemImage: "books.vertical")
-      }.tag(4)
-    }
-    .environmentObject(store).tint(nutrientGreen)
-    .foregroundStyle(Color("FieldInk"))
-    .toolbarBackground(Color("FieldSurface"), for: .tabBar)
-    .toolbarBackground(.visible, for: .tabBar)
-    .task {
-      await store.loadDatabase()
-      #if DEBUG
-        // Render-only launch routing for simulator design reviews; never modifies diary data.
-        let args = ProcessInfo.processInfo.arguments
-        if let index = args.firstIndex(of: "--design-tab"), args.indices.contains(index + 1),
-          let tab = Int(args[index + 1]), (0...4).contains(tab)
-        {
-          store.tab = tab
-        }
-      #endif
-    }
-    .alert(
-      "Couldn't complete that",
-      isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })
-    ) {
-      Button("OK", role: .cancel) { store.error = nil }
-    } message: {
-      Text(store.error ?? "")
-    }
+    NativeToday()
+      .sheet(isPresented: $store.showingChat) {
+        NativeChat().environmentObject(store).presentationDragIndicator(.visible)
+      }
+      .environmentObject(store).tint(nutrientGreen)
+      .foregroundStyle(Color("FieldInk"))
+      .task { await store.loadDatabase() }
+      .alert(
+        "Couldn't complete that",
+        isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })
+      ) {
+        Button("OK", role: .cancel) { store.error = nil }
+      } message: {
+        Text(store.error ?? "")
+      }
   }
 }
 let calorieAccent = Color("FieldOchre")
@@ -124,10 +106,29 @@ struct NativeToday: View {
   @Environment(\.dynamicTypeSize) private var typeSize
   @EnvironmentObject var store: NutrientStore
   @State private var add = false
+  @State private var scan = false
   var tracked: [NutrientDefinition] { store.nutrients.filter { $0.group != "Macros" } }
   var body: some View {
     NavigationStack {
       FieldList {
+        Section {
+          (typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))) {
+              Button {
+                scan = true
+              } label: {
+                Label("Scan barcode", systemImage: "barcode.viewfinder")
+                  .font(.headline).frame(maxWidth: .infinity, minHeight: 60)
+              }.buttonStyle(.bordered).tint(nutrientGreen)
+              Button {
+                store.showingChat = true
+              } label: {
+                Label("Quick log", systemImage: "bubble.left.and.text.bubble.right")
+                  .font(.headline).frame(maxWidth: .infinity, minHeight: 60)
+              }.buttonStyle(.borderedProminent).foregroundStyle(nutrientOnGreen)
+            }.listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            .listRowBackground(Color.clear)
+        }
         Section {
           (typeSize.isAccessibilitySize
             ? AnyLayout(VStackLayout(spacing: 24))
@@ -167,7 +168,13 @@ struct NativeToday: View {
         }
         NativeDailyGaps()
         Section { NavigationLink("All \(store.nutrients.count) nutrients") { NativeNutrients() } }
-        Section("Recent food") {
+        Section {
+          NavigationLink {
+            NativeDiary()
+          } label: {
+            Label("Food log & past days", systemImage: "calendar")
+          }
+
           if store.day.entries.isEmpty { Button("Log food") { add = true } }
           ForEach(store.day.entries) { entry in
             NativeLoggedEntry(entry: entry, sourceDate: store.date)
@@ -181,6 +188,28 @@ struct NativeToday: View {
       }.fieldSurface().fieldTitle("Today")
         .onAppear { store.date = Date() }
         .toolbar {
+          ToolbarItem(placement: .topBarLeading) {
+            Menu {
+              NavigationLink {
+                NativeTrends()
+              } label: {
+                Label("Trends", systemImage: "chart.xyaxis.line")
+              }
+              NavigationLink {
+                NativeLibrary()
+              } label: {
+                Label("Library", systemImage: "books.vertical")
+              }
+              NavigationLink {
+                NativeSettings()
+              } label: {
+                Label("Settings", systemImage: "slider.horizontal.3")
+              }
+            } label: {
+              Image(systemName: "line.3.horizontal").frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel("Trends, library and settings")
+          }
           ToolbarItem(placement: .topBarTrailing) {
             Button {
               add = true
@@ -190,6 +219,7 @@ struct NativeToday: View {
           }
         }
         .sheet(isPresented: $add) { NativeFoodSearch() }
+        .sheet(isPresented: $scan) { NativeScanSheet() }
     }
   }
 }
@@ -239,7 +269,7 @@ struct NativeDailyGaps: View {
         }
       }
       Button {
-        store.tab = 2
+        store.showingChat = true
         Task {
           await store.send(
             "Which foods would help me hit the remaining nutrient goals for \(store.key(store.date))? Use my logged intake and remaining calories; suggest food options without logging them."
@@ -543,120 +573,118 @@ struct NativeDiary: View {
     store.day.entries.filter { store.food($0.foodId).map { !$0.isSupplement } ?? false }
   }
   var body: some View {
-    NavigationStack {
-      FieldList {
-        DatePicker("Date", selection: $store.date, displayedComponents: .date)
-        if !selecting {
-          NavigationLink {
-            NativeDailyCoverage()
-          } label: {
-            LabeledContent(
-              "Nutrient coverage",
-              value: store.day.entries.isEmpty
-                ? "No food logged"
-                : "\(number(store.score()))% · \(store.dailyGaps.count) still short")
-          }
+    FieldList {
+      DatePicker("Date", selection: $store.date, displayedComponents: .date)
+      if !selecting {
+        NavigationLink {
+          NativeDailyCoverage()
+        } label: {
+          LabeledContent(
+            "Nutrient coverage",
+            value: store.day.entries.isEmpty
+              ? "No food logged"
+              : "\(number(store.score()))% · \(store.dailyGaps.count) still short")
         }
-        if store.day.entries.isEmpty {
-          ContentUnavailableView {
-            Label("No food logged", systemImage: "fork.knife")
-          } actions: {
-            Button("Add food") { add = true }.buttonStyle(.borderedProminent)
-              .foregroundStyle(nutrientOnGreen)
-          }
+      }
+      if store.day.entries.isEmpty {
+        ContentUnavailableView {
+          Label("No food logged", systemImage: "fork.knife")
+        } actions: {
+          Button("Add food") { add = true }.buttonStyle(.borderedProminent)
+            .foregroundStyle(nutrientOnGreen)
         }
-        ForEach(
-          nativeMeals.filter { meal in store.day.entries.contains { $0.meal == meal } }, id: \.self
-        ) { meal in
-          Section(meal) {
-            let entries = store.day.entries.filter { $0.meal == meal }
-            ForEach(entries) { entry in
-              if selecting {
-                if let food = store.food(entry.foodId) {
-                  Button {
-                    if selectedIDs.contains(entry.id) {
-                      selectedIDs.remove(entry.id)
-                    } else {
-                      selectedIDs.insert(entry.id)
-                    }
-                  } label: {
-                    HStack(alignment: .top, spacing: 12) {
-                      Image(
-                        systemName: selectedIDs.contains(entry.id)
-                          ? "checkmark.circle.fill" : "circle"
-                      )
-                      .font(.title2).foregroundStyle(nutrientGreen)
-                      VStack(alignment: .leading, spacing: 5) {
-                        Text(food.name).foregroundStyle(.primary)
-                        Text(
-                          "\(entry.quantity.formatted(.number.precision(.fractionLength(0...3)))) × \(food.serving)"
-                        )
-                        .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
-                      }
-                    }.padding(.vertical, 4)
-                  }.buttonStyle(.plain).disabled(food.isSupplement)
-                    .accessibilityLabel(
-                      "\(selectedIDs.contains(entry.id) ? "Deselect" : "Select") \(food.name)"
-                    )
-                    .accessibilityAddTraits(selectedIDs.contains(entry.id) ? .isSelected : [])
-                }
-              } else {
-                NativeLoggedEntry(entry: entry, sourceDate: store.date)
-              }
-            }
-            if !selecting { Button("Add food") { add = true } }
-          }
-        }
-      }.fieldSurface().fieldTitle("Diary")
-        .toolbar {
-          ToolbarItem(placement: .topBarLeading) {
-            Button(selecting ? "Cancel" : "Select") {
-              selectedIDs.removeAll()
-              selecting.toggle()
-            }.disabled(!selecting && selectable.isEmpty)
-          }
-          ToolbarItem(placement: .topBarTrailing) {
+      }
+      ForEach(
+        nativeMeals.filter { meal in store.day.entries.contains { $0.meal == meal } }, id: \.self
+      ) { meal in
+        Section(meal) {
+          let entries = store.day.entries.filter { $0.meal == meal }
+          ForEach(entries) { entry in
             if selecting {
-              Button(selectedIDs.count == selectable.count ? "Deselect all" : "Select all") {
-                selectedIDs = selectedIDs.count == selectable.count ? [] : Set(selectable.map(\.id))
-              }.disabled(selectable.isEmpty)
+              if let food = store.food(entry.foodId) {
+                Button {
+                  if selectedIDs.contains(entry.id) {
+                    selectedIDs.remove(entry.id)
+                  } else {
+                    selectedIDs.insert(entry.id)
+                  }
+                } label: {
+                  HStack(alignment: .top, spacing: 12) {
+                    Image(
+                      systemName: selectedIDs.contains(entry.id)
+                        ? "checkmark.circle.fill" : "circle"
+                    )
+                    .font(.title2).foregroundStyle(nutrientGreen)
+                    VStack(alignment: .leading, spacing: 5) {
+                      Text(food.name).foregroundStyle(.primary)
+                      Text(
+                        "\(entry.quantity.formatted(.number.precision(.fractionLength(0...3)))) × \(food.serving)"
+                      )
+                      .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+                    }
+                  }.padding(.vertical, 4)
+                }.buttonStyle(.plain).disabled(food.isSupplement)
+                  .accessibilityLabel(
+                    "\(selectedIDs.contains(entry.id) ? "Deselect" : "Select") \(food.name)"
+                  )
+                  .accessibilityAddTraits(selectedIDs.contains(entry.id) ? .isSelected : [])
+              }
             } else {
-              Button {
-                add = true
-              } label: {
-                Image(systemName: "plus")
-              }.accessibilityLabel("Log food")
+              NativeLoggedEntry(entry: entry, sourceDate: store.date)
             }
           }
+          if !selecting { Button("Add food") { add = true } }
         }
-        .safeAreaInset(edge: .bottom) {
+      }
+    }.fieldSurface().fieldTitle("Diary")
+      .toolbar {
+        ToolbarItem(placement: .topBarLeading) {
+          Button(selecting ? "Cancel" : "Select") {
+            selectedIDs.removeAll()
+            selecting.toggle()
+          }.disabled(!selecting && selectable.isEmpty)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
           if selecting {
+            Button(selectedIDs.count == selectable.count ? "Deselect all" : "Select all") {
+              selectedIDs = selectedIDs.count == selectable.count ? [] : Set(selectable.map(\.id))
+            }.disabled(selectable.isEmpty)
+          } else {
             Button {
-              let entries = selectable.filter { selectedIDs.contains($0.id) }
-              mealDraft = NativeDiaryMealDraft(
-                date: store.date, entryIDs: Set(entries.map(\.id)),
-                items: entries.compactMap { entry in
-                  store.food(entry.foodId).map { MealItem(food: $0, quantity: entry.quantity) }
-                })
+              add = true
             } label: {
-              Text("Save as meal (\(selectedIDs.count))").font(.headline).frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-            }.buttonStyle(.borderedProminent).tint(nutrientGreen)
-              .foregroundStyle(selectedIDs.isEmpty ? Color.secondary : nutrientOnGreen)
-              .disabled(selectedIDs.isEmpty).padding().background(.bar)
+              Image(systemName: "plus")
+            }.accessibilityLabel("Log food")
           }
         }
-        .onChange(of: store.date) { _, _ in selectedIDs.removeAll() }
-        .sheet(isPresented: $add) { NativeFoodSearch() }
-        .sheet(item: $mealDraft) { draft in
-          NativeDiaryMealSave(
-            draft: draft,
-            saved: {
-              selecting = false
-              selectedIDs.removeAll()
-            })
+      }
+      .safeAreaInset(edge: .bottom) {
+        if selecting {
+          Button {
+            let entries = selectable.filter { selectedIDs.contains($0.id) }
+            mealDraft = NativeDiaryMealDraft(
+              date: store.date, entryIDs: Set(entries.map(\.id)),
+              items: entries.compactMap { entry in
+                store.food(entry.foodId).map { MealItem(food: $0, quantity: entry.quantity) }
+              })
+          } label: {
+            Text("Save as meal (\(selectedIDs.count))").font(.headline).frame(maxWidth: .infinity)
+              .padding(.vertical, 6)
+          }.buttonStyle(.borderedProminent).tint(nutrientGreen)
+            .foregroundStyle(selectedIDs.isEmpty ? Color.secondary : nutrientOnGreen)
+            .disabled(selectedIDs.isEmpty).padding().background(.bar)
         }
-    }
+      }
+      .onChange(of: store.date) { _, _ in selectedIDs.removeAll() }
+      .sheet(isPresented: $add) { NativeFoodSearch() }
+      .sheet(item: $mealDraft) { draft in
+        NativeDiaryMealSave(
+          draft: draft,
+          saved: {
+            selecting = false
+            selectedIDs.removeAll()
+          })
+      }
   }
 }
 struct NativeNutrients: View {
@@ -685,6 +713,7 @@ struct NativeNutrients: View {
   }
 }
 struct NativeChat: View {
+  @Environment(\.dismiss) private var dismiss
   @EnvironmentObject var store: NutrientStore
   @StateObject private var speech = NativeDictation()
   @State private var speechPrefix = ""
@@ -766,8 +795,9 @@ struct NativeChat: View {
           .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
           .safeAreaInset(edge: .bottom, spacing: 0) { composer }
       }
-      .fieldSurface().fieldTitle("Chat")
+      .fieldSurface().fieldTitle("Quick log")
       .toolbar {
+        ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
         ToolbarItem(placement: .topBarTrailing) {
           Button {
             focused = false
@@ -781,6 +811,7 @@ struct NativeChat: View {
       .sheet(isPresented: $scan) { NativeScanSheet() }
       .sheet(isPresented: $search) { NativeFoodSearch() }
       .onChange(of: speech.transcript) { _, text in store.draft = speechPrefix + text }
+      .onAppear { focused = true }
       .onDisappear { speech.stop() }
       .alert(
         "Dictation",
@@ -1137,100 +1168,98 @@ struct NativeTrends: View {
   var buckets: [NativeTrendBucket] { store.trendBuckets(interval, count: range, metric: metric) }
   var unit: String { metric == "calories" ? "kcal" : "%" }
   var body: some View {
-    NavigationStack {
-      FieldList {
-        Section {
-          Picker(
-            "Frequency",
-            selection: Binding(
-              get: { interval },
-              set: {
-                interval = $0
-                range = $0.ranges[1]
-              })
-          ) {
-            ForEach(NativeTrendInterval.allCases) { Text($0.rawValue).tag($0) }
-          }.fieldSegments()
-          Picker("Range", selection: $range) {
-            ForEach(interval.ranges, id: \.self) { Text("\($0) \(interval.rangeUnit)").tag($0) }
-          }
+    FieldList {
+      Section {
+        Picker(
+          "Frequency",
+          selection: Binding(
+            get: { interval },
+            set: {
+              interval = $0
+              range = $0.ranges[1]
+            })
+        ) {
+          ForEach(NativeTrendInterval.allCases) { Text($0.rawValue).tag($0) }
+        }.fieldSegments()
+        Picker("Range", selection: $range) {
+          ForEach(interval.ranges, id: \.self) { Text("\($0) \(interval.rangeUnit)").tag($0) }
         }
-        Section(interval == .daily && metric != "score" ? "Daily intake" : interval.heading) {
-          Picker("Show", selection: $metric) {
-            Text("Coverage").tag("score")
-            Text("Energy").tag("calories")
-            ForEach(store.nutrients) { n in Text(n.name).tag(n.id) }
-          }
-          if buckets.isEmpty {
-            Text("No data for this nutrient yet.").foregroundStyle(Color("FieldSecondary"))
-          } else {
-            if let latest = buckets.last {
-              VStack(alignment: .leading, spacing: 6) {
-                Text(periodLabel(latest.date)).font(.subheadline).foregroundStyle(
-                  Color("FieldSecondary"))
-                Text("\(number(latest.value)) \(unit)")
-                  .font(.system(.largeTitle, design: .default).weight(.semibold))
-                  .foregroundStyle(nutrientGreen)
-                Text(
-                  metric == "calories"
-                    ? "Target \(number(store.state.calorieTarget)) kcal" : "Target 100%"
-                )
-                .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
-              }.padding(.vertical, 6).accessibilityElement(children: .combine)
-            }
-            chart.frame(height: 220).padding(.vertical, 10)
-          }
+      }
+      Section(interval == .daily && metric != "score" ? "Daily intake" : interval.heading) {
+        Picker("Show", selection: $metric) {
+          Text("Coverage").tag("score")
+          Text("Energy").tag("calories")
+          ForEach(store.nutrients) { n in Text(n.name).tag(n.id) }
         }
-        if !buckets.isEmpty {
-          Section(interval == .daily ? "By day" : interval == .weekly ? "By week" : "By month") {
-            ForEach(buckets.reversed()) { bucket in
-              LabeledContent {
-                Text("\(bucket.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)")
-                  .monospacedDigit().foregroundStyle(nutrientGreen)
-              } label: {
-                Text(periodLabel(bucket.date))
-              }
-            }
-          }
-        }
-        if averages.isEmpty {
-          Section {
-            Text("Log meals to see your averages and gaps.").foregroundStyle(
-              Color("FieldSecondary"))
-            Button("Log a meal in Chat") { store.tab = 2 }
-          }
+        if buckets.isEmpty {
+          Text("No data for this nutrient yet.").foregroundStyle(Color("FieldSecondary"))
         } else {
-          Section("Average daily intake") {
-            ForEach(averages) { average in
-              VStack(alignment: .leading, spacing: 7) {
-                HStack {
-                  Text(average.nutrient.name).font(.headline)
-                  Spacer()
-                  Text("\(number(average.percentage))%").foregroundStyle(nutrientGreen)
-                }
-                HStack(alignment: .top) {
-                  VStack(alignment: .leading, spacing: 3) {
-                    Text("\(number(average.value)) \(average.nutrient.unit)")
-                    Text("Target \(number(average.target)) \(average.nutrient.unit)").font(.caption)
-                      .foregroundStyle(Color("FieldSecondary"))
-                  }
-                  Spacer()
-                  Text(
-                    average.gap > 0
-                      ? "Gap \(number(average.gap)) \(average.nutrient.unit)" : "Target met"
-                  ).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
-                }
-                ProgressView(value: min(1, average.percentage / 100)).tint(nutrientGreen)
-                if !average.complete {
-                  Text("Partial data").font(.caption).foregroundStyle(Color("FieldSecondary"))
-                }
-              }.padding(.vertical, 6)
+          if let latest = buckets.last {
+            VStack(alignment: .leading, spacing: 6) {
+              Text(periodLabel(latest.date)).font(.subheadline).foregroundStyle(
+                Color("FieldSecondary"))
+              Text("\(number(latest.value)) \(unit)")
+                .font(.system(.largeTitle, design: .default).weight(.semibold))
+                .foregroundStyle(nutrientGreen)
+              Text(
+                metric == "calories"
+                  ? "Target \(number(store.state.calorieTarget)) kcal" : "Target 100%"
+              )
+              .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+            }.padding(.vertical, 6).accessibilityElement(children: .combine)
+          }
+          chart.frame(height: 220).padding(.vertical, 10)
+        }
+      }
+      if !buckets.isEmpty {
+        Section(interval == .daily ? "By day" : interval == .weekly ? "By week" : "By month") {
+          ForEach(buckets.reversed()) { bucket in
+            LabeledContent {
+              Text("\(bucket.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)")
+                .monospacedDigit().foregroundStyle(nutrientGreen)
+            } label: {
+              Text(periodLabel(bucket.date))
             }
           }
         }
+      }
+      if averages.isEmpty {
+        Section {
+          Text("Log meals to see your averages and gaps.").foregroundStyle(
+            Color("FieldSecondary"))
+          Button("Log a meal in Chat") { store.showingChat = true }
+        }
+      } else {
+        Section("Average daily intake") {
+          ForEach(averages) { average in
+            VStack(alignment: .leading, spacing: 7) {
+              HStack {
+                Text(average.nutrient.name).font(.headline)
+                Spacer()
+                Text("\(number(average.percentage))%").foregroundStyle(nutrientGreen)
+              }
+              HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 3) {
+                  Text("\(number(average.value)) \(average.nutrient.unit)")
+                  Text("Target \(number(average.target)) \(average.nutrient.unit)").font(.caption)
+                    .foregroundStyle(Color("FieldSecondary"))
+                }
+                Spacer()
+                Text(
+                  average.gap > 0
+                    ? "Gap \(number(average.gap)) \(average.nutrient.unit)" : "Target met"
+                ).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+              }
+              ProgressView(value: min(1, average.percentage / 100)).tint(nutrientGreen)
+              if !average.complete {
+                Text("Partial data").font(.caption).foregroundStyle(Color("FieldSecondary"))
+              }
+            }.padding(.vertical, 6)
+          }
+        }
+      }
 
-      }.fieldSurface().fieldTitle("Trends")
-    }
+    }.fieldSurface().fieldTitle("Trends")
   }
   private var chart: some View {
     Chart {

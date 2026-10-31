@@ -208,7 +208,7 @@ struct NativeDayContext: Encodable {
 @MainActor final class NutrientStore: ObservableObject {
   @Published var state: NativeState
   @Published var date = Date()
-  @Published var tab = 0
+  @Published var showingChat = false
   @Published var database: [NativeFood] = []
   @Published var sending = false
   @Published var chatError: String?

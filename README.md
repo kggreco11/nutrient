@@ -137,7 +137,7 @@ Issues and pull requests are welcome. Include reproduction steps for bugs, keep 
 
 ## iPhone design directions
 
-The [design review](design/2026-10-31/research.md) compares three directions inspired by Kevin’s [photography](https://kevingreco.me/photography): **Field**, **Slate**, and **Golden**. Field is implemented in the native SwiftUI app, with light/dark colors, short serif titles, readable food rows, direct Library navigation, nutrient filters, and a fixed meal confirmation action.
+The [design review](design/2026-10-31/research.md) compares three directions inspired by Kevin’s [photography](https://kevingreco.me/photography): **Field**, **Slate**, and **Golden**. Field is implemented in the native SwiftUI app, with light/dark colors, short serif titles, readable food rows, nutrient filters, and a fixed meal confirmation action. The latest revision removes the bottom tabs and puts Scan barcode and Quick log directly on the daily home.
 
 ![Three iPhone design directions](design/2026-10-31/personal-directions.jpg)
 
@@ -148,3 +148,7 @@ python3 -m http.server 5188 --bind 127.0.0.1 --directory design/2026-10-31
 ```
 
 Open `http://127.0.0.1:5188/`. The HTML files are design-review artifacts; the shipping iOS UI is SwiftUI. See the [verification record](design/2026-10-31/verification.md) for the checks performed and remaining device checks.
+
+The [latest layout review](design/2026-10-31/navigation-notes.md) compares **Journal**, **Capture**, and **Meals** using the same palette and different page structures. Open `http://127.0.0.1:5188/navigation.html` after starting the review server.
+
+![Three tab-free layout directions](design/2026-10-31/navigation-comparison.jpg)

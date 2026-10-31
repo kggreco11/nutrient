@@ -1,0 +1,199 @@
+.capture-pair,
+.meal-capture {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.capture-pair button {
+  font-size: calc(16px * var(--font-scale));
+  min-height: 68px;
+  flex-direction: column;
+  gap: 6px;
+}
+.journal-summary {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 16px;
+  border-radius: 20px;
+}
+.journal-summary .ring {
+  width: 90px;
+  height: 90px;
+}
+.journal-summary .ring-value strong {
+  font-size: calc(27px * var(--font-scale));
+}
+.journal-summary .ring-wrap {
+  gap: 4px;
+}
+.journal-summary .ring-wrap > span {
+  font-size: calc(13px * var(--font-scale));
+}
+.journal-summary .macro {
+  padding-top: 8px;
+}
+.journal-summary .macro .row {
+  font-size: calc(14px * var(--font-scale));
+}
+.small-gaps .row {
+  font-size: calc(15px * var(--font-scale));
+}
+.meal-timeline {
+  padding-top: 4px;
+}
+.timeline-meal {
+  border-left: 2px solid var(--line);
+  padding-left: 14px;
+  margin-left: 4px;
+  padding-bottom: 16px;
+}
+.timeline-meal .meal-heading {
+  margin: 12px 0 6px;
+}
+.timeline-meal .meal-heading span {
+  font-size: calc(14px * var(--font-scale));
+  color: var(--muted);
+}
+.timeline-meal .row {
+  font-size: calc(15px * var(--font-scale));
+}
+.capture-hero {
+  padding-top: 12px;
+}
+.capture-hero h3 {
+  font-family: ui-serif, Georgia, serif;
+  font-size: calc(32px * var(--font-scale));
+  line-height: 1.15;
+  margin: 14px 0 20px;
+  font-weight: 550;
+}
+.meal-input {
+  width: 100%;
+  border: 1px solid var(--accent);
+  border-radius: 18px;
+  padding: 18px;
+  min-height: 106px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--muted);
+  background: var(--surface);
+  text-align: left;
+  font-size: calc(19px * var(--font-scale));
+}
+.capture-shortcuts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+.capture-shortcuts .secondary {
+  font-size: calc(14px * var(--font-scale));
+  padding: 10px 8px;
+}
+.progress-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+  margin: 20px 0 10px;
+}
+.progress-strip button {
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--ink);
+  padding: 0;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.progress-strip b {
+  font-size: calc(30px * var(--font-scale));
+  line-height: 1;
+}
+.progress-strip span {
+  font-size: calc(14px * var(--font-scale));
+  color: var(--muted);
+}
+.capture-dock {
+  padding: 12px 16px 28px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.capture-dock .capture-pair {
+  margin: 0;
+}
+.capture-dock button {
+  flex-direction: row;
+  min-height: 52px;
+  font-size: calc(15px * var(--font-scale));
+}
+.meal-capture button {
+  min-height: 46px;
+  font-size: calc(14px * var(--font-scale));
+  padding: 10px 8px;
+}
+.layout-table .progress-strip {
+  margin-top: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+}
+.remaining-strip {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  width: 100%;
+  text-align: left;
+  padding: 12px 0;
+  display: grid;
+  gap: 6px;
+  color: var(--ink);
+  min-height: 64px;
+}
+.remaining-strip span {
+  font-size: calc(14px * var(--font-scale));
+  color: var(--muted);
+}
+.navigation-menu {
+  position: absolute;
+  z-index: 8;
+  top: 106px;
+  left: 12px;
+  right: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  display: grid;
+  gap: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px #0002;
+}
+.size-large .capture-pair,
+.size-large .meal-capture,
+.size-large .capture-shortcuts,
+.size-large .progress-strip {
+  grid-template-columns: 1fr;
+}
+.size-large .journal-summary .ring {
+  width: 180px;
+  height: 180px;
+}
+.size-large .capture-dock .capture-pair {
+  grid-template-columns: 1fr 1fr;
+}
+.size-large .capture-dock button {
+  font-size: 18px;
+  flex-direction: column;
+}
+.layout-clear .screen-body,
+.layout-table .screen-body {
+  padding-bottom: 34px;
+}
