@@ -152,6 +152,41 @@ import UIKit
     mealStore.log([MealItem(food: bread, quantity: .nan), MealItem(food: cheese, quantity: 1)], meal: "Lunch", groupedAs: "Invalid")
     precondition(mealStore.day.entries.count == beforeInvalid)
     print("Combined meal logging, quantities, ingredient snapshots, partial data, supplements and persistence passed")
+    let trendStore = NutrientStore(seedURL: seedURL, storageURL: directory.appendingPathComponent("trends.json"), mirrorPreferences: false)
+    let trendCalendar = NativeTrendInterval.weekly.calendar
+    trendStore.date = trendCalendar.date(from: DateComponents(year: 2027, month: 1, day: 6, hour: 12))!
+    trendStore.state.targets["vitC"] = 90
+    let halfC = NativeFood(id: "half-c", name: "Half C", serving: "1 serving", calories: 100, values: ["vitC": 45])
+    let fullC = NativeFood(id: "full-c", name: "Full C", serving: "1 serving", calories: 200, values: ["vitC": 90])
+    let zeroC = NativeFood(id: "zero-c", name: "Zero C", serving: "1 serving", calories: 0, values: ["vitC": 0])
+    let unknownC = NativeFood(id: "unknown-c", name: "Unknown C", serving: "1 serving", calories: 300, values: ["vitC": nil])
+    [halfC, fullC, zeroC, unknownC].forEach { trendStore.remember($0) }
+    func trendDay(_ food: NativeFood, _ id: String = UUID().uuidString) -> DiaryDay {
+      DiaryDay(entries: [DiaryEntry(id: id, foodId: food.id, quantity: 1, meal: "Lunch")])
+    }
+    trendStore.state.days = [
+      "2026-12-27": trendDay(halfC), "2026-12-28": trendDay(halfC),
+      "2027-01-03": trendDay(fullC), "2027-01-04": trendDay(zeroC),
+      "2027-01-05": trendDay(unknownC), "2027-01-07": trendDay(fullC),
+      "2027-01-01": trendDay(fullC, "sample-test"),
+      "2027-01-02": DiaryDay(entries: trendDay(fullC).entries, demo: true),
+    ]
+    let dailyC = trendStore.trendBuckets(.daily, count: 10, metric: "vitC")
+    precondition(dailyC.map { $0.value } == [50, 100, 0], "Daily buckets must preserve explicit zero, skip unknown/future/demo days")
+    let weeklyC = trendStore.trendBuckets(.weekly, count: 2, metric: "vitC")
+    precondition(weeklyC.count == 2 && weeklyC[0].value == 75 && weeklyC[1].value == 0)
+    precondition(trendStore.key(weeklyC[0].date) == "2026-12-28" && trendStore.key(weeklyC[1].date) == "2027-01-04")
+    precondition(weeklyC.map { $0.days } == [2, 1], "Missing/unknown days must not dilute nutrient averages")
+    let monthlyC = trendStore.trendBuckets(.monthly, count: 2, metric: "vitC")
+    precondition(monthlyC.map { $0.value } == [50, 50], "Month grouping must remain available")
+    let dailyEnergy = trendStore.trendBuckets(.daily, count: 10, metric: "calories")
+    precondition(dailyEnergy.map { $0.value } == [100, 200, 0, 300])
+    let dailyScore = trendStore.trendBuckets(.daily, count: 10, metric: "score")
+    let weeklyScore = trendStore.trendBuckets(.weekly, count: 2, metric: "score")
+    precondition(abs(weeklyScore[0].value - (dailyScore[0].value + dailyScore[1].value) / 2) < 0.000001)
+    let summary = trendStore.averages(interval: .weekly, count: 2).first { $0.id == "vitC" }!
+    precondition(summary.reportedDays == 3 && abs(summary.value - 45) < 0.000001)
+    print("Daily, Monday-week and monthly trends passed: year boundaries, unknown/zero, gaps, future/sample exclusion and matching summaries")
     for style in [UIUserInterfaceStyle.light, .dark] {
       let traits = UITraitCollection(userInterfaceStyle: style)
       traits.performAsCurrent {

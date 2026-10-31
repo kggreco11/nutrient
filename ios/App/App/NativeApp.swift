@@ -837,31 +837,43 @@ struct NativeScanSheet: View {
 }
 struct NativeTrends: View {
   @EnvironmentObject var store: NutrientStore
-  @State private var range = 6
+  @State private var interval = NativeTrendInterval.daily
+  @State private var range = 14
   @State private var metric = "score"
-  var averages: [IntakeAverage] { store.averages(months: range) }
-  var months: [MonthAverage] { store.months(range, metric: metric) }
+  var averages: [IntakeAverage] { store.averages(interval: interval, count: range) }
+  var buckets: [NativeTrendBucket] { store.trendBuckets(interval, count: range, metric: metric) }
   var unit: String { metric == "calories" ? "kcal" : "%" }
   var body: some View {
     NavigationStack {
       List {
         Section {
-          Picker("Range", selection: $range) {
-            Text("3 months").tag(3)
-            Text("6 months").tag(6)
-            Text("12 months").tag(12)
+          Picker("Frequency", selection: Binding(get: { interval }, set: { interval = $0; range = $0.ranges[1] })) {
+            ForEach(NativeTrendInterval.allCases) { Text($0.rawValue).tag($0) }
           }.pickerStyle(.segmented)
+          Picker("Range", selection: $range) {
+            ForEach(interval.ranges, id: \.self) { Text("\($0) \(interval.rangeUnit)").tag($0) }
+          }
         }
-        Section("Monthly averages") {
+        Section(interval == .daily && metric != "score" ? "Daily intake" : interval.heading) {
           Picker("Show", selection: $metric) {
             Text("Nutrient score").tag("score")
             Text("Energy").tag("calories")
             ForEach(store.nutrients) { n in Text(n.name).tag(n.id) }
           }
-          if months.isEmpty {
+          if buckets.isEmpty {
             Text("No data for this nutrient yet.").foregroundStyle(.secondary)
           } else {
             chart.frame(height: 220).padding(.vertical, 10)
+          }
+        }
+        if !buckets.isEmpty {
+          Section(interval == .daily ? "By day" : interval == .weekly ? "By week" : "By month") {
+            ForEach(buckets.reversed()) { bucket in
+              LabeledContent {
+                Text("\(bucket.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)")
+                  .monospacedDigit().foregroundStyle(nutrientGreen)
+              } label: { Text(periodLabel(bucket.date)) }
+            }
           }
         }
         if averages.isEmpty {
@@ -904,22 +916,40 @@ struct NativeTrends: View {
   }
   private var chart: some View {
     Chart {
-      ForEach(months) { month in
-        BarMark(x: .value("Month", month.date, unit: .month), y: .value("Food", month.foodOnly))
+      ForEach(buckets) { bucket in
+        BarMark(x: .value("Period", bucket.date), y: .value("Food", bucket.foodOnly),
+          width: .fixed(CGFloat(max(4, min(28, 240 / Double(range))))))
           .foregroundStyle(by: .value("Source", "Food"))
-        BarMark(
-          x: .value("Month", month.date, unit: .month),
-          y: .value("Supplements", max(0, month.value - month.foodOnly))
-        ).foregroundStyle(by: .value("Source", "Supplements"))
+        BarMark(x: .value("Period", bucket.date), y: .value("Supplements", max(0, bucket.value - bucket.foodOnly)),
+          width: .fixed(CGFloat(max(4, min(28, 240 / Double(range))))))
+          .foregroundStyle(by: .value("Source", "Supplements"))
       }
       RuleMark(y: .value("Target", metric == "calories" ? store.state.calorieTarget : 100))
         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4])).foregroundStyle(.secondary)
     }.chartForegroundStyleScale(["Food": nutrientGreen, "Supplements": Color.orange.opacity(0.7)])
+      .chartXScale(domain: store.trendStart(interval, count: range)...interval.calendar.date(byAdding: interval.component, value: 1, to: interval.start(of: store.date))!, range: .plotDimension(padding: 16))
       .chartXAxis {
-        AxisMarks(values: .stride(by: .month)) { _ in
-          AxisValueLabel(format: .dateTime.month(.abbreviated))
+        AxisMarks(values: axisDates) { _ in
+          if interval == .monthly { AxisValueLabel(format: .dateTime.month(.abbreviated)) }
+          else { AxisValueLabel(format: .dateTime.month(.abbreviated).day()) }
         }
       }
+  }
+  private var axisDates: [Date] {
+    let step = max(1, Int(ceil(Double(range) / 5)))
+    let first = store.trendStart(interval, count: range)
+    return stride(from: 0, to: range, by: step).compactMap {
+      interval.calendar.date(byAdding: interval.component, value: $0, to: first)
+    }
+  }
+  private func periodLabel(_ date: Date) -> String {
+    switch interval {
+    case .daily: return date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+    case .weekly:
+      let end = min(store.date, interval.calendar.date(byAdding: .day, value: 6, to: date)!)
+      return "\(date.formatted(.dateTime.month(.abbreviated).day())) – \(end.formatted(.dateTime.month(.abbreviated).day()))"
+    case .monthly: return date.formatted(.dateTime.month(.wide).year())
+    }
   }
 }
 struct NativeMore: View {

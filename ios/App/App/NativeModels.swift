@@ -138,12 +138,34 @@ struct IntakeAverage: Identifiable {
   var percentage: Double { target > 0 ? value / target * 100 : 0 }
   var gap: Double { max(0, target - value) }
 }
-struct MonthAverage: Identifiable {
+struct NativeTrendBucket: Identifiable {
   let date: Date
   let value: Double
   let foodOnly: Double
   let days: Int
   var id: Date { date }
+}
+enum NativeTrendInterval: String, CaseIterable, Identifiable {
+  case daily = "Daily", weekly = "Weekly", monthly = "Monthly"
+  var id: String { rawValue }
+  var component: Calendar.Component {
+    switch self { case .daily: return .day; case .weekly: return .weekOfYear; case .monthly: return .month }
+  }
+  var ranges: [Int] {
+    switch self { case .daily: return [7, 14, 30]; case .weekly: return [4, 8, 12]; case .monthly: return [3, 6, 12] }
+  }
+  var rangeUnit: String {
+    switch self { case .daily: return "days"; case .weekly: return "weeks"; case .monthly: return "months" }
+  }
+  var heading: String { self == .daily ? "Daily scores" : "\(rawValue) averages" }
+  var calendar: Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .current
+    calendar.firstWeekday = 2 // Monday–Sunday, including weeks across month/year boundaries.
+    calendar.minimumDaysInFirstWeek = 4
+    return calendar
+  }
+  func start(of date: Date) -> Date { calendar.dateInterval(of: component, for: date)!.start }
 }
 let nativeMeals = ["Breakfast", "Lunch", "Dinner", "Snacks", "Supplements"]
 let nutrientGreen = Color(
@@ -561,15 +583,15 @@ struct NativeDayContext: Encodable {
     } catch { chatError = error.localizedDescription }
   }
   var realDays: [(String, DiaryDay)] {
-    state.days.map { key, day in
+    state.days.filter { $0.value.demo != true }.map { key, day in
       (key, DiaryDay(entries: day.entries.filter { !$0.id.hasPrefix("sample-") }, water: day.water))
     }.filter { !$0.1.entries.isEmpty && $0.0 <= key(date) }.sorted { $0.0 < $1.0 }
   }
-  func averages(months: Int) -> [IntakeAverage] {
-    let start = Calendar.current.date(
-      byAdding: .month, value: -months + 1,
-      to: Calendar.current.date(
-        from: Calendar.current.dateComponents([.year, .month], from: date))!)!
+  func trendStart(_ interval: NativeTrendInterval, count: Int) -> Date {
+    interval.calendar.date(byAdding: interval.component, value: -max(0, count - 1), to: interval.start(of: date))!
+  }
+  func averages(interval: NativeTrendInterval, count: Int) -> [IntakeAverage] {
+    let start = trendStart(interval, count: count)
     let days = realDays.filter { $0.0 >= key(start) }
     return nutrients.filter { $0.group != "Macros" }.compactMap { n in
       let known = days.filter { $0.1.entries.contains { food($0.foodId)?.value(n.id) != nil } }
@@ -586,30 +608,31 @@ struct NativeDayContext: Encodable {
         target: state.targets[n.id] ?? n.target, reportedDays: known.count, complete: complete)
     }.sorted { $0.percentage < $1.percentage }
   }
-  func months(_ count: Int, metric: String) -> [MonthAverage] {
-    let calendar = Calendar.current
-    let current = calendar.date(from: calendar.dateComponents([.year, .month], from: date))!
-    return (0..<count).reversed().compactMap { offset in
-      let month = calendar.date(byAdding: .month, value: -offset, to: current)!
-      let prefix = String(key(month).prefix(7))
-      let days = realDays.filter {
-        $0.0.hasPrefix(prefix)
-          && (metric == "score" || metric == "calories"
-            || $0.1.entries.contains { food($0.foodId)?.value(metric) != nil })
-      }
-      guard !days.isEmpty else { return nil }
-      @MainActor func value(_ entries: [DiaryEntry]) -> Double {
-        metric == "score"
-          ? score(entries: entries)
-          : metric == "calories"
-            ? total(metric, entries: entries)
-            : total(metric, entries: entries) / (state.targets[metric] ?? 1) * 100
-      }
-      return MonthAverage(
-        date: month, value: days.reduce(0) { $0 + value($1.1.entries) } / Double(days.count),
-        foodOnly: days.reduce(0) {
-          $0 + value($1.1.entries.filter { food($0.foodId)?.isSupplement != true })
-        } / Double(days.count), days: days.count)
+  func trendBuckets(_ interval: NativeTrendInterval, count: Int, metric: String) -> [NativeTrendBucket] {
+    let calendar = interval.calendar
+    let first = trendStart(interval, count: count)
+    let formatter = DateFormatter()
+    formatter.calendar = calendar
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = calendar.timeZone
+    formatter.dateFormat = "yyyy-MM-dd"
+    let eligible = realDays.filter { $0.0 >= key(first) }.compactMap { day -> (Date, DiaryDay)? in
+      guard let parsed = formatter.date(from: day.0) else { return nil }
+      if metric != "score" && metric != "calories" && !day.1.entries.contains(where: { food($0.foodId)?.value(metric) != nil }) { return nil }
+      return (interval.start(of: parsed), day.1)
+    }
+    let grouped = Dictionary(grouping: eligible, by: { $0.0 })
+    func value(_ entries: [DiaryEntry]) -> Double {
+      metric == "score" ? score(entries: entries)
+        : metric == "calories" ? total(metric, entries: entries)
+        : total(metric, entries: entries) / (state.targets[metric] ?? 1) * 100
+    }
+    return grouped.keys.sorted().map { start in
+      let days = grouped[start]!
+      return NativeTrendBucket(date: start,
+        value: days.reduce(0) { $0 + value($1.1.entries) } / Double(days.count),
+        foodOnly: days.reduce(0) { $0 + value($1.1.entries.filter { food($0.foodId)?.isSupplement != true }) } / Double(days.count),
+        days: days.count)
     }
   }
   func export() throws -> URL {

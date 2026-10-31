@@ -14,7 +14,7 @@ Log food in plain language, scan a barcode or nutrition label, and see which nut
 - **Nutrition-label photos:** photograph a Nutrition Facts panel or choose an existing photo to prefill a custom food. Review the extracted serving, calories, and nutrient amounts before saving.
 - **Measurement conversion:** enter grams, ounces, pounds, kilograms, or available food-specific measures such as cups, tablespoons, slices, and pieces. See the gram equivalent while calories and nutrients update.
 - **Reusable library:** save custom foods, meals, and supplements. Edit diary entries and portions; archive library items while keeping historical entries intact.
-- **Longer views:** monthly nutrient and calorie averages, target comparisons, and recorded shortfall patterns.
+- **Daily, weekly, and monthly trends:** individual-day scores, Monday–Sunday weekly averages, and monthly nutrient/calorie averages. Choose a time range and read exact dated values alongside target comparisons.
 - **Local storage:** diary, targets, and library persist on the device, with JSON export/import.
 
 The iPhone interface is written in **SwiftUI**, using native navigation, tabs, forms, camera capture, and charts. A separate Vite web companion shares nutrition data and server modules. Web assets are not embedded in the iOS app.
