@@ -188,8 +188,8 @@ enum NativeTrendInterval: String, CaseIterable, Identifiable {
 let nativeMeals = ["Breakfast", "Lunch", "Dinner", "Snacks", "Supplements"]
 let nutrientGreen = Color(uiColor: UIColor(named: "FieldFern") ?? UIColor { traits in
   traits.userInterfaceStyle == .dark
-    ? UIColor(red: 177/255, green: 216/255, blue: 186/255, alpha: 1)
-    : UIColor(red: 54/255, green: 95/255, blue: 77/255, alpha: 1)
+    ? UIColor(red: 163/255, green: 211/255, blue: 183/255, alpha: 1)
+    : UIColor(red: 39/255, green: 99/255, blue: 76/255, alpha: 1)
 })
 let nutrientOnGreen = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? .black : .white })
 func number(_ value: Double) -> String {

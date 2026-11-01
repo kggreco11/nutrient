@@ -4,6 +4,10 @@
 
 Log food in plain language, scan a barcode or nutrition label, and see which nutrients you have covered—and which still need attention. Nutrient combines a SwiftUI iPhone app, a bundled food database, and an optional AI assistant. Nutrient tracking and historical views have no subscription gate.
 
+<img src="design/2026-11-01/identity/home-light.png" width="300" alt="Native Nutrient home in warm neutral light mode" /> <img src="design/2026-11-01/identity/home-dark.png" width="300" alt="Native Nutrient home in charcoal dark mode" />
+
+Native Simulator captures with synthetic diary data. See the [visual identity implementation](design/2026-11-01/identity/implementation.md).
+
 ## Features
 
 - **Today at a glance:** nutrient-coverage and calorie rings, plus protein, carbohydrate, and fat progress bars.

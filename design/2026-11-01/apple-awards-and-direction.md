@@ -1,6 +1,6 @@
 # Award references and the next visual pass
 
-Researched November 1, 2026. Layout and interaction fixes are implemented; the stronger visual identity proposed here is not implemented. This is a selected set of relevant references, not an objective ranking of mobile design awards.
+Researched November 1, 2026. The resulting native visual pass is now implemented; see the [implementation and verification record](identity/implementation.md). The research and recommendations below record the direction that informed it. This is a selected set of relevant references, not an objective ranking of mobile design awards.
 
 ## Primary Apple references
 
