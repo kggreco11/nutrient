@@ -143,6 +143,13 @@ struct FieldForm<Content: View>: View {
     Form { content.listRowBackground(Color("FieldSurface")) }.fieldSurface()
   }
 }
+// Align the actual circles, independent of title or detail wrapping in either column.
+private enum NutrientRingCenter: AlignmentID {
+  static func defaultValue(in dimensions: ViewDimensions) -> CGFloat { dimensions[VerticalAlignment.center] }
+}
+private extension VerticalAlignment {
+  static let nutrientRingCenter = VerticalAlignment(NutrientRingCenter.self)
+}
 struct DashboardRing: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
@@ -176,10 +183,12 @@ struct DashboardRing: View {
           ).rotationEffect(.degrees(-90))
           VStack(spacing: 2) {
             Text(number(value)).font(.system(.title, design: .rounded).weight(.medium))
+              .lineLimit(1).minimumScaleFactor(0.6)
               .contentTransition(.numericText(value: value))
             Text(unit).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
           }
         }.frame(width: 104, height: 104)
+          .alignmentGuide(.nutrientRingCenter) { $0[VerticalAlignment.center] }
       }
       Text(detail).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
         .fixedSize(horizontal: false, vertical: true)
@@ -297,7 +306,7 @@ struct NativeToday: View {
               detail: store.date.formatted(.dateTime.month(.abbreviated).day()))
             (typeSize.isAccessibilitySize
               ? AnyLayout(VStackLayout(spacing: FieldSpace.section))
-              : AnyLayout(HStackLayout(alignment: .top, spacing: FieldSpace.inset))) {
+              : AnyLayout(HStackLayout(alignment: .nutrientRingCenter, spacing: FieldSpace.inset))) {
               NavigationLink { NativeDailyCoverage() } label: {
                 DashboardRing(title: "Nutrient coverage", value: store.score(), target: 100, unit: "%",
                   detail: "\(tracked.filter { store.reported($0.id) && store.total($0.id) >= (store.state.targets[$0.id] ?? $0.target) }.count) of \(tracked.count) targets met", color: nutrientGreen, opensDetail: true)
