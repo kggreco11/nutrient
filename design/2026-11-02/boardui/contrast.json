@@ -1,0 +1,146 @@
+[
+  {
+    "mode": "light",
+    "text": "FieldInk",
+    "surface": "FieldBackground",
+    "ratio": 16.55
+  },
+  {
+    "mode": "light",
+    "text": "FieldInk",
+    "surface": "FieldSurface",
+    "ratio": 17.72
+  },
+  {
+    "mode": "light",
+    "text": "FieldSecondary",
+    "surface": "FieldBackground",
+    "ratio": 5.82
+  },
+  {
+    "mode": "light",
+    "text": "FieldSecondary",
+    "surface": "FieldSurface",
+    "ratio": 6.23
+  },
+  {
+    "mode": "light",
+    "text": "FieldFern",
+    "surface": "FieldBackground",
+    "ratio": 6.59
+  },
+  {
+    "mode": "light",
+    "text": "FieldFern",
+    "surface": "FieldSurface",
+    "ratio": 7.06
+  },
+  {
+    "mode": "light",
+    "text": "FieldOchre",
+    "surface": "FieldBackground",
+    "ratio": 5.87
+  },
+  {
+    "mode": "light",
+    "text": "FieldOchre",
+    "surface": "FieldSurface",
+    "ratio": 6.29
+  },
+  {
+    "mode": "light",
+    "text": "FieldError",
+    "surface": "FieldBackground",
+    "ratio": 5.91
+  },
+  {
+    "mode": "light",
+    "text": "FieldError",
+    "surface": "FieldSurface",
+    "ratio": 6.33
+  },
+  {
+    "mode": "light",
+    "text": "primary button label",
+    "surface": "accent alpha 1",
+    "ratio": 7.06
+  },
+  {
+    "mode": "light",
+    "text": "primary button label",
+    "surface": "accent alpha 0.92",
+    "ratio": 5.87
+  },
+  {
+    "mode": "dark",
+    "text": "FieldInk",
+    "surface": "FieldBackground",
+    "ratio": 17.93
+  },
+  {
+    "mode": "dark",
+    "text": "FieldInk",
+    "surface": "FieldSurface",
+    "ratio": 15.93
+  },
+  {
+    "mode": "dark",
+    "text": "FieldSecondary",
+    "surface": "FieldBackground",
+    "ratio": 8.78
+  },
+  {
+    "mode": "dark",
+    "text": "FieldSecondary",
+    "surface": "FieldSurface",
+    "ratio": 7.81
+  },
+  {
+    "mode": "dark",
+    "text": "FieldFern",
+    "surface": "FieldBackground",
+    "ratio": 11.19
+  },
+  {
+    "mode": "dark",
+    "text": "FieldFern",
+    "surface": "FieldSurface",
+    "ratio": 9.94
+  },
+  {
+    "mode": "dark",
+    "text": "FieldOchre",
+    "surface": "FieldBackground",
+    "ratio": 10.0
+  },
+  {
+    "mode": "dark",
+    "text": "FieldOchre",
+    "surface": "FieldSurface",
+    "ratio": 8.89
+  },
+  {
+    "mode": "dark",
+    "text": "FieldError",
+    "surface": "FieldBackground",
+    "ratio": 9.04
+  },
+  {
+    "mode": "dark",
+    "text": "FieldError",
+    "surface": "FieldSurface",
+    "ratio": 8.03
+  },
+  {
+    "mode": "dark",
+    "text": "primary button label",
+    "surface": "accent alpha 1",
+    "ratio": 12.56
+  },
+  {
+    "mode": "dark",
+    "text": "primary button label",
+    "surface": "accent alpha 0.92",
+    "ratio": 10.76
+  }
+]

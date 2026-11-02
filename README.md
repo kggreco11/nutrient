@@ -4,9 +4,9 @@
 
 Log food in plain language, scan a barcode or nutrition label, and see which nutrients you have covered—and which still need attention. Nutrient combines a SwiftUI iPhone app, a bundled food database, and an optional AI assistant. Nutrient tracking and historical views have no subscription gate.
 
-<img src="design/2026-11-01/identity/home-light.png" width="300" alt="Native Nutrient home in warm neutral light mode" /> <img src="design/2026-11-01/identity/home-dark.png" width="300" alt="Native Nutrient home in charcoal dark mode" />
+<img src="design/2026-11-02/boardui/home-light.png" width="300" alt="Native Nutrient home with Inter typography in light mode" /> <img src="design/2026-11-02/boardui/home-dark.png" width="300" alt="Native Nutrient home with Inter typography in dark mode" />
 
-Native Simulator captures with synthetic diary data. See the [visual identity implementation](design/2026-11-01/identity/implementation.md).
+Native Simulator captures with synthetic diary data. See the [BoardUI-inspired native refinement](design/2026-11-02/boardui/implementation.md).
 
 ## Features
 
@@ -143,7 +143,7 @@ Issues and pull requests are welcome. Include reproduction steps for bugs, keep 
 
 ## iPhone design directions
 
-The [design review](design/2026-10-31/research.md) compares three directions inspired by Kevin’s [photography](https://kevingreco.me/photography): **Field**, **Slate**, and **Golden**. Field is implemented in the native SwiftUI app, with light/dark colors, short serif titles, readable food rows, nutrient filters, and a fixed meal confirmation action. The latest revision removes the bottom tabs and puts Scan barcode and Quick log directly on the daily home.
+The [design review](design/2026-10-31/research.md) compares three directions inspired by Kevin’s [photography](https://kevingreco.me/photography): **Field**, **Slate**, and **Golden**. The native SwiftUI app has since evolved to a BoardUI-inspired treatment with bundled Inter typography, neutral light/dark panels, readable food rows, nutrient filters, and a fixed meal confirmation action. Scan barcode and Quick log remain directly on the daily home, with labeled navigation and no bottom tabs.
 
 ![Three iPhone design directions](design/2026-10-31/personal-directions.jpg)
 

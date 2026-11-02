@@ -3,6 +3,31 @@ import Charts
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
+
+// Inter is bundled locally; semantic styles preserve iOS Dynamic Type scaling.
+enum NutrientType {
+  static func font(_ style: Font.TextStyle, weight: Font.Weight? = nil) -> Font {
+    let size: CGFloat
+    switch style {
+    case .largeTitle: size = 34
+    case .title: size = 28
+    case .title2: size = 22
+    case .title3: size = 20
+    case .headline, .body: size = 17
+    case .callout: size = 16
+    case .subheadline: size = 15
+    case .footnote: size = 13
+    case .caption: size = 12
+    case .caption2: size = 11
+    default: size = 17
+    }
+    let chosen = weight ?? (style == .headline ? .semibold : .regular)
+    let face = chosen == .bold ? "Inter-Bold" : chosen == .semibold ? "Inter-SemiBold"
+      : chosen == .medium ? "Inter-Medium" : "Inter-Regular"
+    return .custom(face, size: size, relativeTo: style)
+  }
+}
 
 struct NutrientAppView: View {
   @StateObject private var store: NutrientStore
@@ -43,6 +68,7 @@ struct NutrientAppView: View {
         NativeChat().environmentObject(store).presentationDragIndicator(.visible)
       }
       .environmentObject(store).tint(nutrientGreen)
+      .font(NutrientType.font(.body))
       .foregroundStyle(Color("FieldInk"))
       .task {
         #if DEBUG
@@ -164,14 +190,14 @@ struct DashboardRing: View {
   var body: some View {
     VStack(spacing: FieldSpace.item) {
       HStack(spacing: 5) {
-        Text(title).font(.subheadline.weight(.semibold))
+        Text(title).font(NutrientType.font(.subheadline, weight: .semibold))
         if opensDetail {
-          Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+          Image(systemName: "chevron.right").font(NutrientType.font(.caption, weight: .semibold))
             .foregroundStyle(Color("FieldSecondary")).accessibilityHidden(true)
         }
       }
       if typeSize.isAccessibilitySize {
-        Text("\(number(value)) \(unit)").font(.title.weight(.semibold))
+        Text("\(number(value)) \(unit)").font(NutrientType.font(.title, weight: .semibold))
           .contentTransition(.numericText(value: value))
           .fixedSize(horizontal: false, vertical: true)
         ProgressView(value: fraction).tint(color)
@@ -182,15 +208,15 @@ struct DashboardRing: View {
             color, style: StrokeStyle(lineWidth: 5, lineCap: .round)
           ).rotationEffect(.degrees(-90))
           VStack(spacing: 2) {
-            Text(number(value)).font(.system(.title, design: .rounded).weight(.medium))
+            Text(number(value)).font(NutrientType.font(.title, weight: .medium)).tracking(-0.7)
               .lineLimit(1).minimumScaleFactor(0.6)
               .contentTransition(.numericText(value: value))
-            Text(unit).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+            Text(unit).font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
           }
         }.frame(width: 104, height: 104)
           .alignmentGuide(.nutrientRingCenter) { $0[VerticalAlignment.center] }
       }
-      Text(detail).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+      Text(detail).font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
         .fixedSize(horizontal: false, vertical: true)
     }.multilineTextAlignment(.center).frame(maxWidth: .infinity)
       .accessibilityElement(children: .ignore)
@@ -216,20 +242,27 @@ struct NutrientWordmark: View {
       NutrientMark().stroke(nutrientGreen, style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
         .frame(width: 18, height: 23).accessibilityHidden(true)
       if !typeSize.isAccessibilitySize {
-        Text("nutrient").font(.system(.title2, design: .serif).weight(.semibold)).tracking(-0.7)
+        Text("nutrient").font(NutrientType.font(.title2, weight: .semibold)).tracking(-0.4)
       }
     }.accessibilityElement(children: .ignore).accessibilityLabel("Nutrient")
   }
 }
 struct NutrientCaptureStyle: ButtonStyle {
+  @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var primary = false
   func makeBody(configuration: Configuration) -> some View {
-    configuration.label.font(.body.weight(.semibold))
+    configuration.label.font(NutrientType.font(.body, weight: .medium))
       .frame(maxWidth: .infinity, minHeight: 54)
       .foregroundStyle(primary ? nutrientOnGreen : Color("FieldInk"))
-      .background(primary ? nutrientGreen : Color("FieldSurface"), in: RoundedRectangle(cornerRadius: 14))
-      .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(primary ? Color.clear : Color("FieldRule"), lineWidth: 1))
+      .background {
+        RoundedRectangle(cornerRadius: 12).fill(
+          LinearGradient(colors: primary
+            ? [nutrientGreen, nutrientGreen.opacity(0.92)]
+            : [Color("FieldSurface"), Color("FieldSurface")], startPoint: .top, endPoint: .bottom))
+      }
+      .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(primary ? nutrientGreen : Color("FieldRule"), lineWidth: 1))
+      .shadow(color: .black.opacity(colorScheme == .dark ? 0.12 : 0.05), radius: 1, y: 1)
       .opacity(configuration.isPressed ? 0.84 : 1)
       .scaleEffect(configuration.isPressed && !reduceMotion ? 0.985 : 1)
       .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
@@ -252,21 +285,23 @@ struct NutrientSectionHeading: View {
   var detail: String? = nil
   var body: some View {
     FieldValuePair {
-      Text(title).font(.system(.title3, design: .serif).weight(.semibold))
+      Text(title).font(NutrientType.font(.title3, weight: .medium))
     } trailing: {
-      if let detail { Text(detail).font(.subheadline).foregroundStyle(Color("FieldSecondary")) }
+      if let detail { Text(detail).font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary")) }
     }.accessibilityAddTraits(.isHeader)
   }
 }
 // Group related information without making every metric look like a separate destination.
 struct NutrientHomeSection<Content: View>: View {
+  @Environment(\.colorScheme) private var colorScheme
   @ViewBuilder var content: Content
   var body: some View {
     VStack(alignment: .leading, spacing: FieldSpace.controls) { content }
       .padding(FieldSpace.inset)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Color("FieldSurface"), in: RoundedRectangle(cornerRadius: 18))
-      .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color("FieldRule"), lineWidth: 0.5))
+      .background(Color("FieldSurface"), in: RoundedRectangle(cornerRadius: 20))
+      .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color("FieldRule"), lineWidth: 0.5))
+      .shadow(color: .black.opacity(colorScheme == .dark ? 0.10 : 0.035), radius: 1, y: 1)
   }
 }
 struct NutrientHomeLink: View {
@@ -274,9 +309,9 @@ struct NutrientHomeLink: View {
   let symbol: String
   var body: some View {
     HStack(spacing: FieldSpace.item) {
-      Label(title, systemImage: symbol).font(.subheadline.weight(.semibold))
+      Label(title, systemImage: symbol).font(NutrientType.font(.subheadline, weight: .semibold))
       Spacer(minLength: 8)
-      Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+      Image(systemName: "chevron.right").font(NutrientType.font(.caption, weight: .semibold))
     }.frame(minHeight: 44).contentShape(Rectangle())
   }
 }
@@ -323,15 +358,15 @@ struct NativeToday: View {
                   VStack(spacing: FieldSpace.item) {
                     FieldValuePair {
                       HStack(spacing: FieldSpace.tight) {
-                        Text(id == "carbs" ? "Carbs" : id.capitalized).font(.body.weight(.medium))
-                        if value >= target { Image(systemName: "checkmark").font(.subheadline).foregroundStyle(nutrientGreen).accessibilityHidden(true) }
+                        Text(id == "carbs" ? "Carbs" : id.capitalized).font(NutrientType.font(.body, weight: .medium))
+                        if value >= target { Image(systemName: "checkmark").font(NutrientType.font(.subheadline)).foregroundStyle(nutrientGreen).accessibilityHidden(true) }
                       }
                     } trailing: {
                       HStack(spacing: 8) {
-                        (Text(number(value)).font(.body.weight(.semibold)).foregroundColor(Color("FieldInk"))
-                          + Text(" / \(number(target)) g").font(.subheadline).foregroundColor(Color("FieldSecondary")))
+                        (Text(number(value)).font(NutrientType.font(.body, weight: .semibold)).foregroundColor(Color("FieldInk"))
+                          + Text(" / \(number(target)) g").font(NutrientType.font(.subheadline)).foregroundColor(Color("FieldSecondary")))
                           .contentTransition(.numericText(value: value))
-                        Image(systemName: "chevron.right").font(.subheadline).foregroundStyle(Color("FieldSecondary")).accessibilityHidden(true)
+                        Image(systemName: "chevron.right").font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary")).accessibilityHidden(true)
                       }
                     }
                     NutrientMeter(fraction: value / max(1, target))
@@ -353,7 +388,7 @@ struct NativeToday: View {
               NutrientHomeLink(title: "View & edit food log", symbol: "square.and.pencil")
             }.buttonStyle(.plain).foregroundStyle(nutrientGreen)
             if store.day.entries.isEmpty {
-              Text("Nothing logged today.").font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+              Text("Nothing logged today.").font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
             }
             ForEach(store.day.entries) { entry in
               NativeLoggedEntry(entry: entry, sourceDate: store.date).padding(.vertical, 10)
@@ -386,7 +421,7 @@ struct NativeToday: View {
               NavigationLink { NativeTrends() } label: { Label("Trends", systemImage: "chart.xyaxis.line") }
               NavigationLink { NativeLibrary() } label: { Label("Library", systemImage: "books.vertical") }
               NavigationLink { NativeSettings() } label: { Label("Settings", systemImage: "slider.horizontal.3") }
-            } label: { Text("Menu").font(.subheadline.weight(.medium)).frame(minWidth: 44, minHeight: 44) }
+            } label: { Text("Menu").font(NutrientType.font(.subheadline, weight: .medium)).frame(minWidth: 44, minHeight: 44) }
               .accessibilityLabel("Trends, library and settings")
           }
           ToolbarItem(placement: .topBarTrailing) {
@@ -434,13 +469,13 @@ struct NativeDailyGaps: View {
               Text(gap.nutrient.name)
             } trailing: {
               HStack(spacing: 8) {
-                Text("\(number(gap.remaining)) \(gap.nutrient.unit) left").font(.subheadline.weight(.semibold)).foregroundStyle(nutrientGreen)
-                if home { Image(systemName: "chevron.right").font(.subheadline).foregroundStyle(Color("FieldSecondary")).accessibilityHidden(true) }
+                Text("\(number(gap.remaining)) \(gap.nutrient.unit) left").font(NutrientType.font(.subheadline, weight: .semibold)).foregroundStyle(nutrientGreen)
+                if home { Image(systemName: "chevron.right").font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary")).accessibilityHidden(true) }
               }
             }
             NutrientMeter(fraction: gap.fraction)
             if gap.partial {
-              Text("Partial intake data").font(.footnote).foregroundStyle(Color("FieldSecondary"))
+              Text("Partial intake data").font(NutrientType.font(.footnote)).foregroundStyle(Color("FieldSecondary"))
             }
           }.padding(.vertical, home ? 10 : 4).frame(minHeight: 44).contentShape(Rectangle())
         }.buttonStyle(.plain).foregroundStyle(.primary)
@@ -449,7 +484,7 @@ struct NativeDailyGaps: View {
       if !showAll && store.dailyGaps.count > 3 {
         Button(expanded ? "Show fewer" : "Show all \(store.dailyGaps.count) shortfalls") {
           expanded.toggle()
-        }.font(.subheadline.weight(.medium)).frame(minHeight: 44)
+        }.font(NutrientType.font(.subheadline, weight: .medium)).frame(minHeight: 44)
       }
       if !store.day.entries.isEmpty && !store.unreportedNutrients.isEmpty {
         DisclosureGroup {
@@ -469,7 +504,7 @@ struct NativeDailyGaps: View {
         }
       } label: {
         Label("Find foods for these gaps", systemImage: "sparkles")
-          .font(.subheadline.weight(.medium)).frame(minHeight: 44).contentShape(Rectangle())
+          .font(NutrientType.font(.subheadline, weight: .medium)).frame(minHeight: 44).contentShape(Rectangle())
       }.disabled(store.sending)
   }
 }
@@ -497,14 +532,14 @@ struct NativeNutrientDetail: View {
   var body: some View {
     FieldList {
       Section {
-        Text(store.date, format: .dateTime.month(.wide).day().year()).font(.subheadline)
+        Text(store.date, format: .dateTime.month(.wide).day().year()).font(NutrientType.font(.subheadline))
           .foregroundStyle(Color("FieldSecondary"))
         FieldValuePair {
           Text(
             store.reported(id)
               ? "\(store.incomplete(id) ? "≥ " : "")\(number(store.total(id))) \(nutrient.unit)"
               : "Not reported"
-          ).font(.system(.largeTitle, design: .rounded).weight(.medium))
+          ).font(NutrientType.font(.largeTitle, weight: .medium))
         } trailing: {
           Text("of \(number(store.state.targets[id] ?? nutrient.target)) \(nutrient.unit)")
             .foregroundStyle(Color("FieldSecondary"))
@@ -547,7 +582,7 @@ struct NativeNutrientDetail: View {
                     } else {
                       Text("Not reported").foregroundStyle(Color("FieldSecondary"))
                     }
-                  }.font(.subheadline)
+                  }.font(NutrientType.font(.subheadline))
                 }
               }
             }
@@ -589,13 +624,13 @@ struct NativeNutrientRow: View {
             store.reported(nutrient.id)
               ? "\(number(value)) / \(number(target)) \(nutrient.unit)"
               : "— / \(number(target)) \(nutrient.unit)"
-          ).font(.subheadline).foregroundStyle(Color("FieldSecondary")).multilineTextAlignment(
+          ).font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary")).multilineTextAlignment(
             .trailing)
         }
         if store.reported(nutrient.id) {
           ProgressView(value: min(value / target, 1)).tint(nutrientGreen)
           if store.incomplete(nutrient.id) {
-            Text("Partial data").font(.caption).foregroundStyle(Color("FieldSecondary"))
+            Text("Partial data").font(NutrientType.font(.caption)).foregroundStyle(Color("FieldSecondary"))
           }
         } else {
           Text(store.day.entries.isEmpty ? "No food logged" : "Not reported in logged foods").font(
@@ -618,19 +653,19 @@ struct NativeLoggedEntry: View {
       } label: {
         FieldValuePair {
           VStack(alignment: .leading, spacing: 5) {
-            Text(food.name).font(.body.weight(.medium)).foregroundStyle(Color("FieldInk"))
-            Text("\(number(entry.quantity)) × \(food.serving) · \(entry.meal)").font(.subheadline)
+            Text(food.name).font(NutrientType.font(.body, weight: .medium)).foregroundStyle(Color("FieldInk"))
+            Text("\(number(entry.quantity)) × \(food.serving) · \(entry.meal)").font(NutrientType.font(.subheadline))
               .foregroundStyle(Color("FieldSecondary"))
           }
         } trailing: {
           HStack(spacing: 12) {
             VStack(alignment: .trailing, spacing: 2) {
               Text(food.energyUnreported == true ? "—" : number(food.calories * entry.quantity))
-                .font(.body.weight(.semibold)).foregroundStyle(Color("FieldInk"))
+                .font(NutrientType.font(.body, weight: .semibold)).foregroundStyle(Color("FieldInk"))
               Text(food.energyUnreported == true ? "Unreported" : "kcal")
-                .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+                .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
             }
-            Image(systemName: "pencil").font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+            Image(systemName: "pencil").font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
           }
         }
       }.buttonStyle(.plain).contentShape(Rectangle()).accessibilityHint("Edit portion, meal, or date")
@@ -667,11 +702,11 @@ struct NativeEntryEditor: View {
       FieldForm {
         if let food = store.food(entry.foodId) {
           Section {
-            Text(food.name).font(.headline)
+            Text(food.name).font(NutrientType.font(.headline))
             if let components = food.components {
               ForEach(Array(components.enumerated()), id: \.offset) { _, component in
                 Text("\(component.name) · \(number(component.quantity)) × \(component.serving)")
-                  .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+                  .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
               }
             }
             NativeQuantityInput(food: food, quantity: $quantity)
@@ -730,7 +765,7 @@ struct NativeDiaryMealSave: View {
               Text(
                 "\(item.quantity.formatted(.number.precision(.fractionLength(0...3)))) × \(item.food.serving)"
               )
-              .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+              .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
             }
           }
           LabeledContent(
@@ -807,13 +842,13 @@ struct NativeDiary: View {
                       systemName: selectedIDs.contains(entry.id)
                         ? "checkmark.circle.fill" : "circle"
                     )
-                    .font(.title2).foregroundStyle(nutrientGreen)
+                    .font(NutrientType.font(.title2)).foregroundStyle(nutrientGreen)
                     VStack(alignment: .leading, spacing: 5) {
                       Text(food.name).foregroundStyle(.primary)
                       Text(
                         "\(entry.quantity.formatted(.number.precision(.fractionLength(0...3)))) × \(food.serving)"
                       )
-                      .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+                      .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
                     }
                   }.padding(.vertical, 4)
                 }.buttonStyle(.plain).disabled(food.isSupplement)
@@ -861,7 +896,7 @@ struct NativeDiary: View {
                 store.food(entry.foodId).map { MealItem(food: $0, quantity: entry.quantity) }
               })
           } label: {
-            Text("Save as meal (\(selectedIDs.count))").font(.headline).frame(maxWidth: .infinity)
+            Text("Save as meal (\(selectedIDs.count))").font(NutrientType.font(.headline)).frame(maxWidth: .infinity)
               .padding(.vertical, 6)
           }.buttonStyle(.borderedProminent).tint(nutrientGreen)
             .foregroundStyle(selectedIDs.isEmpty ? Color.secondary : nutrientOnGreen)
@@ -941,7 +976,7 @@ struct NativeChat: View {
         ScrollView {
           LazyVStack(alignment: .leading, spacing: FieldSpace.section) {
             if store.history.isEmpty {
-              Text("What did you eat?").font(.title3).foregroundStyle(Color("FieldSecondary"))
+              Text("What did you eat?").font(NutrientType.font(.title3)).foregroundStyle(Color("FieldSecondary"))
                 .frame(
                   maxWidth: .infinity
                 ).padding(.top, 80)
@@ -968,12 +1003,12 @@ struct NativeChat: View {
             }
             if !store.pending.isEmpty {
               VStack(alignment: .leading, spacing: FieldSpace.controls) {
-                Text("Meal draft").font(.headline)
+                Text("Meal draft").font(NutrientType.font(.headline))
                 ForEach(store.pending) { item in
                   VStack(alignment: .leading, spacing: 4) {
-                    Text(item.food.name).font(.body.weight(.medium))
+                    Text(item.food.name).font(NutrientType.font(.body, weight: .medium))
                     Text("\(number(item.quantity)) × \(item.food.serving)")
-                      .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+                      .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
                   }
                 }
                 Divider()
@@ -990,9 +1025,9 @@ struct NativeChat: View {
                     .padding(.vertical, 8)
                 }.buttonStyle(.borderedProminent).foregroundStyle(nutrientOnGreen)
               }.padding(FieldSpace.inset).background(
-                Color("FieldSurface"), in: RoundedRectangle(cornerRadius: 18)
+                Color("FieldSurface"), in: RoundedRectangle(cornerRadius: 20)
               )
-              .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color("FieldRule"), lineWidth: 1))
+              .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color("FieldRule"), lineWidth: 1))
             }
             Color.clear.frame(height: 1).id("bottom")
           }.padding(FieldSpace.inset).background {
@@ -1186,11 +1221,11 @@ struct MessageRow: View {
   var body: some View {
     HStack {
       if message.role == "user" { Spacer(minLength: 40) }
-      Text(.init(message.content)).textSelection(.enabled).font(.body).lineSpacing(4).padding(
+      Text(.init(message.content)).textSelection(.enabled).font(NutrientType.font(.body)).lineSpacing(4).padding(
         message.role == "user" ? 12 : 0
       ).background(
         message.role == "user" ? Color("FieldSoft") : .clear,
-        in: RoundedRectangle(cornerRadius: 18)
+        in: RoundedRectangle(cornerRadius: 20)
       ).frame(maxWidth: .infinity, alignment: message.role == "user" ? .trailing : .leading)
       if message.role != "user" { Spacer(minLength: 4) }
     }
@@ -1230,9 +1265,9 @@ struct NativeQuantityInput: View {
         Text(
           "\((quantity * grams).formatted(.number.precision(.fractionLength(0...2)))) g · \(quantity.formatted(.number.precision(.fractionLength(0...3)))) × \(food.serving)"
         )
-        .font(.subheadline).foregroundStyle(Color("FieldSecondary")).monospacedDigit()
+        .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary")).monospacedDigit()
       } else {
-        Text("Per serving: \(food.serving)").font(.subheadline).foregroundStyle(
+        Text("Per serving: \(food.serving)").font(NutrientType.font(.subheadline)).foregroundStyle(
           Color("FieldSecondary"))
       }
     }.padding(.vertical, 4)
@@ -1274,13 +1309,13 @@ struct NativeMealReview: View {
                 return "\(number(value * item.quantity)) g \(label)"
               }
               if !macros.isEmpty {
-                Text(macros.joined(separator: " · ")).font(.subheadline)
+                Text(macros.joined(separator: " · ")).font(NutrientType.font(.subheadline))
                   .foregroundStyle(Color("FieldSecondary"))
                   .contentTransition(.numericText())
                   .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: item.quantity)
               }
               if let source = item.food.source {
-                Text(source).font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+                Text(source).font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
               }
               if let url = item.food.sourceUrl, let link = URL(string: url), link.scheme == "https"
               {
@@ -1288,7 +1323,7 @@ struct NativeMealReview: View {
               }
             } label: {
               VStack(alignment: .leading, spacing: FieldSpace.tight) {
-                Text(item.food.name).font(.body.weight(.medium)).foregroundStyle(.primary)
+                Text(item.food.name).font(NutrientType.font(.body, weight: .medium)).foregroundStyle(.primary)
                 FieldValuePair {
                   Text(
                     item.food.gramsPerServing.map {
@@ -1300,7 +1335,7 @@ struct NativeMealReview: View {
                       ? "Energy unreported" : "\(number(item.food.calories * item.quantity)) kcal")
                     .contentTransition(.numericText(value: item.food.calories * item.quantity))
                     .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: item.quantity)
-                }.font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+                }.font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
               }.frame(minHeight: FieldSpace.row, alignment: .leading)
             }
           }.onDelete { offsets in
@@ -1344,7 +1379,7 @@ struct NativeMealReview: View {
             dismiss()
           } label: {
             Label("Confirm & log meal", systemImage: "checkmark")
-              .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 8)
+              .font(NutrientType.font(.headline)).frame(maxWidth: .infinity).padding(.vertical, 8)
           }.buttonStyle(.borderedProminent).foregroundStyle(nutrientOnGreen).disabled(
             items.isEmpty
               || items.contains { $0.quantity <= 0 || $0.quantity > 100 || !$0.quantity.isFinite }
@@ -1445,17 +1480,17 @@ struct FoodRow: View {
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
       Image(systemName: food.isSupplement ? "pills" : food.kind == "meal" ? "fork.knife" : "circle.grid.2x2")
-        .font(.body.weight(.medium)).foregroundStyle(Color("FieldSecondary"))
+        .font(NutrientType.font(.body, weight: .medium)).foregroundStyle(Color("FieldSecondary"))
         .frame(width: 24, height: 26)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 5) {
-        Text(food.name).font(.body.weight(.medium))
+        Text(food.name).font(NutrientType.font(.body, weight: .medium))
         Text(
           food.energyUnreported == true
             ? "\(food.serving) · energy unreported"
             : "\(food.serving) · \(number(food.calories)) kcal"
         )
-        .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+        .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
       }.frame(maxWidth: .infinity, alignment: .leading)
     }.padding(.vertical, 6).accessibilityElement(children: .combine)
   }
@@ -1496,7 +1531,7 @@ struct NativeScanSheet: View {
                 .overlay(alignment: .bottom) {
                   if captured {
                     Label("Barcode captured", systemImage: "checkmark")
-                      .font(.subheadline.weight(.semibold)).padding(10)
+                      .font(NutrientType.font(.subheadline, weight: .semibold)).padding(10)
                       .foregroundStyle(nutrientOnGreen).background(nutrientGreen, in: Capsule())
                       .padding(.bottom, 32)
                   }
@@ -1678,22 +1713,22 @@ struct NativeTrendPlot: View {
     Group {
       if let latest = selection.bucket ?? (selection.date == nil ? buckets.last : nil) {
         VStack(alignment: .leading, spacing: 6) {
-          Text(periodLabel(latest.date)).font(.subheadline).foregroundStyle(
+          Text(periodLabel(latest.date)).font(NutrientType.font(.subheadline)).foregroundStyle(
             Color("FieldSecondary"))
           Text("\(number(latest.value)) \(unit)")
-            .font(.system(.largeTitle, design: .rounded).weight(.medium))
+            .font(NutrientType.font(.largeTitle, weight: .medium))
             .foregroundStyle(Color("FieldInk"))
           Text(
             metric == "calories"
               ? "Target \(number(calorieTarget)) kcal" : "Target 100%"
           )
-          .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+          .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
         }.padding(.vertical, 6).frame(minHeight: 112, alignment: .leading)
           .accessibilityElement(children: .combine)
       } else if let selectedDate = selection.date {
         VStack(alignment: .leading, spacing: 6) {
-          Text(periodLabel(selectedDate)).font(.subheadline)
-          Text("Not recorded").font(.largeTitle.weight(.semibold))
+          Text(periodLabel(selectedDate)).font(NutrientType.font(.subheadline))
+          Text("Not recorded").font(NutrientType.font(.largeTitle, weight: .semibold))
         }.padding(.vertical, 6).frame(minHeight: 112, alignment: .leading)
           .accessibilityElement(children: .combine)
       }
@@ -1779,7 +1814,7 @@ struct NativeAverageRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: FieldSpace.item) {
       FieldValuePair {
-        Text(average.nutrient.name).font(.headline)
+        Text(average.nutrient.name).font(NutrientType.font(.headline))
       } trailing: {
         Text("\(number(average.percentage))%").foregroundStyle(nutrientGreen)
       }
@@ -1787,17 +1822,17 @@ struct NativeAverageRow: View {
         VStack(alignment: .leading, spacing: FieldSpace.tight) {
           Text("\(number(average.value)) \(average.nutrient.unit)")
           Text("Target \(number(average.target)) \(average.nutrient.unit)")
-            .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+            .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
         }
       } trailing: {
         Text(
           average.gap > 0 ? "\(number(average.gap)) \(average.nutrient.unit) short" : "Target met"
         )
-        .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+        .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
       }
       ProgressView(value: min(1, average.percentage / 100)).tint(nutrientGreen)
       if !average.complete {
-        Text("Partial data").font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+        Text("Partial data").font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
       }
     }.padding(.vertical, FieldSpace.tight)
   }
@@ -2142,7 +2177,7 @@ struct NativeSettings: View {
                     store.save()
                   }), format: .number
               ).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
-              Text(n.unit).font(.caption).foregroundStyle(Color("FieldSecondary"))
+              Text(n.unit).font(NutrientType.font(.caption)).foregroundStyle(Color("FieldSecondary"))
             }
           }
         }

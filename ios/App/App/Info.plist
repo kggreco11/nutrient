@@ -66,5 +66,12 @@
 	<string>Dictate a meal description into Nutrient. You review the transcript before sending it.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Use your microphone to dictate a food or meal description. Recording starts only when you tap Speak.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Fonts/Inter-Regular.otf</string>
+		<string>Fonts/Inter-Medium.otf</string>
+		<string>Fonts/Inter-SemiBold.otf</string>
+		<string>Fonts/Inter-Bold.otf</string>
+	</array>
 </dict>
 </plist>

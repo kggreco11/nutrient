@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D3772C45A2054DB2BDA18B4E /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = E7F4F5611033422AAFBFC6CB /* Fonts */; };
 		15C9FB15D59540FF8CFD7FD4 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8BF21A44BC7F4AD99F69D036 /* PrivacyInfo.xcprivacy */; };
 		3DCA44BFD1D946EFB978A128 /* NativeBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1493643561904845AC3AB6FE /* NativeBackend.swift */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -21,6 +22,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		E7F4F5611033422AAFBFC6CB /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Fonts; sourceTree = "<group>"; };
 		1493643561904845AC3AB6FE /* NativeBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBackend.swift; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -66,6 +68,7 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				E7F4F5611033422AAFBFC6CB /* Fonts */,
 				08793D0839E94E0597C91138 /* FoodDatabase.json */,
 				3CC1624FE54E408596D7A1A3 /* NativeSeed.json */,
 				FE89D166DEE34F9E9D18B6F7 /* NativeApp.swift */,
@@ -145,6 +148,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D3772C45A2054DB2BDA18B4E /* Fonts in Resources */,
 				B0D3B72969DA458AB14697BD /* FoodDatabase.json in Resources */,
 				AFB45130833F499092856799 /* NativeSeed.json in Resources */,
 				15C9FB15D59540FF8CFD7FD4 /* PrivacyInfo.xcprivacy in Resources */,
