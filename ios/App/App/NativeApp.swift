@@ -25,6 +25,7 @@ struct NutrientAppView: View {
         switch NativeDesignFixture.argument("--design-screen") {
         case "review": NativeMealReview(items: NativeDesignFixture.ingredients)
         case "trends": NavigationStack { NativeTrends() }
+        case "diary": NavigationStack { NativeDiary() }
         case "nutrient": NavigationStack { NativeNutrientDetail(id: "protein") }
         case "chat": NativeChat()
         default: NativeToday()
@@ -151,10 +152,17 @@ struct DashboardRing: View {
   let unit: String
   let detail: String
   let color: Color
+  var opensDetail = false
   private var fraction: Double { min(1, max(0, value / max(1, target))) }
   var body: some View {
     VStack(spacing: FieldSpace.item) {
-      Text(title).font(.subheadline.weight(.semibold))
+      HStack(spacing: 5) {
+        Text(title).font(.subheadline.weight(.semibold))
+        if opensDetail {
+          Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+            .foregroundStyle(Color("FieldSecondary")).accessibilityHidden(true)
+        }
+      }
       if typeSize.isAccessibilitySize {
         Text("\(number(value)) \(unit)").font(.title.weight(.semibold))
           .contentTransition(.numericText(value: value))
@@ -241,6 +249,28 @@ struct NutrientSectionHeading: View {
     }.accessibilityAddTraits(.isHeader)
   }
 }
+// Group related information without making every metric look like a separate destination.
+struct NutrientHomeSection<Content: View>: View {
+  @ViewBuilder var content: Content
+  var body: some View {
+    VStack(alignment: .leading, spacing: FieldSpace.controls) { content }
+      .padding(FieldSpace.inset)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(Color("FieldSurface"), in: RoundedRectangle(cornerRadius: 18))
+      .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color("FieldRule"), lineWidth: 0.5))
+  }
+}
+struct NutrientHomeLink: View {
+  let title: String
+  let symbol: String
+  var body: some View {
+    HStack(spacing: FieldSpace.item) {
+      Label(title, systemImage: symbol).font(.subheadline.weight(.semibold))
+      Spacer(minLength: 8)
+      Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+    }.frame(minHeight: 44).contentShape(Rectangle())
+  }
+}
 struct NativeToday: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
@@ -262,15 +292,15 @@ struct NativeToday: View {
               Label("Quick log", systemImage: "plus.bubble")
             }.buttonStyle(NutrientCaptureStyle(primary: true))
           }
-          VStack(alignment: .leading, spacing: FieldSpace.inset) {
-            Text(store.date, format: .dateTime.weekday(.wide).month(.abbreviated).day())
-              .font(.subheadline).foregroundStyle(Color("FieldSecondary"))
+          NutrientHomeSection {
+            NutrientSectionHeading(title: "Today’s progress",
+              detail: store.date.formatted(.dateTime.month(.abbreviated).day()))
             (typeSize.isAccessibilitySize
               ? AnyLayout(VStackLayout(spacing: FieldSpace.section))
               : AnyLayout(HStackLayout(alignment: .top, spacing: FieldSpace.inset))) {
               NavigationLink { NativeDailyCoverage() } label: {
                 DashboardRing(title: "Nutrient coverage", value: store.score(), target: 100, unit: "%",
-                  detail: "\(tracked.filter { store.reported($0.id) && store.total($0.id) >= (store.state.targets[$0.id] ?? $0.target) }.count) of \(tracked.count) targets met", color: nutrientGreen)
+                  detail: "\(tracked.filter { store.reported($0.id) && store.total($0.id) >= (store.state.targets[$0.id] ?? $0.target) }.count) of \(tracked.count) targets met", color: nutrientGreen, opensDetail: true)
               }.buttonStyle(.plain).accessibilityHint("See all targets and shortfalls")
               DashboardRing(title: "Calories", value: store.total("calories"), target: store.state.calorieTarget, unit: "kcal",
                 detail: calorieBalanceText(intake: store.total("calories"), target: store.state.calorieTarget), color: calorieAccent)
@@ -302,20 +332,17 @@ struct NativeToday: View {
               }
             }
           }
-          NativeDailyGaps(home: true)
-          NavigationLink { NativeNutrients() } label: {
-            HStack {
-              Text("All \(store.nutrients.count) nutrients").font(.body.weight(.medium))
-              Spacer()
-              Image(systemName: "arrow.right").font(.subheadline)
-            }.padding(.vertical, 12).contentShape(Rectangle())
-          }.buttonStyle(.plain)
-          VStack(alignment: .leading, spacing: FieldSpace.controls) {
-            HStack(alignment: .firstTextBaseline) {
-              Text("Food log").font(.system(.title3, design: .serif).weight(.semibold)).accessibilityAddTraits(.isHeader)
-              Spacer()
-              NavigationLink { NativeDiary() } label: { Label("History", systemImage: "calendar").font(.subheadline).frame(minHeight: 44) }
-            }
+          NutrientHomeSection {
+            NativeDailyGaps(home: true)
+            NavigationLink { NativeNutrients() } label: {
+              NutrientHomeLink(title: "View all \(store.nutrients.count) nutrients", symbol: "list.bullet")
+            }.buttonStyle(.plain).foregroundStyle(nutrientGreen)
+          }
+          NutrientHomeSection {
+            NutrientSectionHeading(title: "Today’s food log", detail: "\(store.day.entries.count) entries")
+            NavigationLink { NativeDiary() } label: {
+              NutrientHomeLink(title: "View & edit food log", symbol: "square.and.pencil")
+            }.buttonStyle(.plain).foregroundStyle(nutrientGreen)
             if store.day.entries.isEmpty {
               Text("Nothing logged today.").font(.subheadline).foregroundStyle(Color("FieldSecondary"))
             }
@@ -324,11 +351,20 @@ struct NativeToday: View {
               Rectangle().fill(Color("FieldRule")).frame(height: 1)
             }
           }
-          VStack(alignment: .leading, spacing: FieldSpace.item) {
+          NutrientHomeSection {
             NutrientSectionHeading(title: "Water")
             Stepper("\(store.day.water) / \(store.state.waterTarget) glasses",
               value: Binding(get: { store.day.water }, set: { store.water($0) }), in: 0...30)
-          }.padding(.vertical, FieldSpace.item)
+          }
+          NutrientHomeSection {
+            NavigationLink { NativeTrends() } label: {
+              NutrientHomeLink(title: "Nutrient trends", symbol: "chart.xyaxis.line")
+            }
+            Rectangle().fill(Color("FieldRule")).frame(height: 1)
+            NavigationLink { NativeLibrary() } label: {
+              NutrientHomeLink(title: "Saved foods & meals", symbol: "books.vertical")
+            }
+          }.buttonStyle(.plain)
         }.frame(maxWidth: 600).padding(.horizontal, FieldSpace.gutter).padding(.top, 12).padding(.bottom, 32)
           .frame(maxWidth: .infinity)
       }.fieldSurface().navigationTitle("Today").navigationBarTitleDisplayMode(.inline)
@@ -341,7 +377,7 @@ struct NativeToday: View {
               NavigationLink { NativeTrends() } label: { Label("Trends", systemImage: "chart.xyaxis.line") }
               NavigationLink { NativeLibrary() } label: { Label("Library", systemImage: "books.vertical") }
               NavigationLink { NativeSettings() } label: { Label("Settings", systemImage: "slider.horizontal.3") }
-            } label: { Image(systemName: "line.3.horizontal").frame(minWidth: 44, minHeight: 44) }
+            } label: { Text("Menu").font(.subheadline.weight(.medium)).frame(minWidth: 44, minHeight: 44) }
               .accessibilityLabel("Trends, library and settings")
           }
           ToolbarItem(placement: .topBarTrailing) {
@@ -362,7 +398,7 @@ struct NativeDailyGaps: View {
   @ViewBuilder var body: some View {
     if home {
       VStack(alignment: .leading, spacing: FieldSpace.item) {
-        NutrientSectionHeading(title: "Still to go", detail: store.day.entries.isEmpty ? nil : "\(store.dailyGaps.count) targets")
+        NutrientSectionHeading(title: "Remaining nutrients", detail: store.day.entries.isEmpty ? nil : "\(store.dailyGaps.count) targets")
         content
       }
     } else {
