@@ -343,7 +343,7 @@ struct NativeToday: View {
               ? AnyLayout(VStackLayout(spacing: FieldSpace.section))
               : AnyLayout(HStackLayout(alignment: .nutrientRingCenter, spacing: FieldSpace.inset))) {
               NavigationLink { NativeDailyCoverage() } label: {
-                DashboardRing(title: "Nutrient coverage", value: store.score(), target: 100, unit: "%",
+                DashboardRing(title: "Coverage", value: store.score(), target: 100, unit: "%",
                   detail: "\(tracked.filter { store.reported($0.id) && store.total($0.id) >= (store.state.targets[$0.id] ?? $0.target) }.count) of \(tracked.count) targets met", color: nutrientGreen, opensDetail: true)
               }.buttonStyle(.plain).accessibilityHint("See all targets and shortfalls")
               DashboardRing(title: "Calories", value: store.total("calories"), target: store.state.calorieTarget, unit: "kcal",
@@ -808,7 +808,7 @@ struct NativeDiary: View {
           NativeDailyCoverage()
         } label: {
           LabeledContent(
-            "Nutrient coverage",
+            "Coverage",
             value: store.day.entries.isEmpty
               ? "No food logged"
               : "\(number(store.score()))% · \(store.dailyGaps.count) still short")
