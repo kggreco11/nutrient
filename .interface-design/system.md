@@ -26,6 +26,12 @@ Spacing: 4 pt base. `FieldSpace`: tight 4, item 8, controls 12, inset 16, sectio
 
 Depth: surface tones and subtle rules. Reserve the main card for the progress summary; other home sections use spacing and headings. Rounded controls 12 pt, summary card 20 pt, recipe/chat surfaces 16–20 pt. Keep chrome quiet; use solid fills and purposeful SF Symbols.
 
+## Information density
+
+- Prefer compact, directly labeled graphs and charts for comparisons and changes over time. Let data carry the report; use at most one short takeaway on the initial report view instead of paragraphs restating chart values.
+- Reveal exact values, methods, reference explanations and research through selection or disclosure. Keep units, time range, comparison basis and recorded-day counts visible; missing or partial data must remain legible without opening fine print.
+- Increase useful information per screen through alignment and clear visual hierarchy, not smaller essential type, extra panels or more simultaneous charts. Provide an accessible exact-value alternative.
+
 ## Nutrition semantics
 
 Coverage is a score out of 100: mean of 31 capped nutrient percentages. It is not the fraction of targets met. Display the score and target-completion count separately; explain the scope in coverage details. Macros and calories are separate from the 31 targets.

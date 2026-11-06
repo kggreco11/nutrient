@@ -6,8 +6,9 @@
 
 - Headless Google Chrome loaded all 4 selectable scenarios with zero JavaScript page errors.
 - 32 layout checks: every scenario at 390 px and 320 px, each with normal/larger text and light/dark appearance. Neither document nor screen content overflowed horizontally. Larger browser text is an approximation for review, not iOS Dynamic Type.
+- 32 additional chart-selection checks covered all four nutrients in each layout/appearance combination. Each series has exactly 24 reported values, 7 absent dates, 8 disconnected line segments and an accurate computed mean. Exact-value disclosure shows all 31 dates.
 - Local Instrument Sans loaded successfully from the app’s bundled font. Native Field light/dark colors guide the study.
-- Report generation defaults to Off. Selecting Monthly and saving displays a receipt. Report-to-chat carries the period and recorded-day context. The sparse-data state explicitly excludes missing dates. Notification settings are mock values and never invoke system permissions or scheduling.
+- Report generation defaults to Off. Cancel discards a draft frequency change; selecting Monthly and saving displays a receipt. Report-to-chat carries the period and recorded-day context. The sparse-data state explicitly excludes missing dates. Notification settings are mock values and never invoke system permissions or scheduling.
 - Captured a representative light-mode screen and a 320 px larger-text dark-mode screen. Reviewed the representative compositions; screenshots contain synthetic data only.
 - Inline JavaScript parsed/executed successfully. Git whitespace checks passed before commit. No runtime app, backend, diary, settings or recipe files changed.
 

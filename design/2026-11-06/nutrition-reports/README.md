@@ -16,9 +16,19 @@ Open `http://127.0.0.1:5198/design/2026-11-06/nutrition-reports/`.
 
 ## Design intent
 
-Useful reflection, on your terms. A quiet archive under Trends. Give recorded data its context, and let the user choose whether reports ever interrupt them.
+Chart-first reports with high information density and low reading burden. Start with a compact nutrient comparison and one selected daily series. Use one short takeaway; let charts carry the quantities and relationships. Explanations, sources, methods and exact values open on demand.
 
 Domain: recorded days, intake, portions, reference intakes, personal targets, evidence provenance, goal decisions. Palette: the existing Field background/surface/ink/secondary/rule/fern assets; food-scale neutrals with fern actions. Signature: a nutrient quantity accompanied by its exact comparison basis and data coverage. Avoided defaults: unsolicited coaching cards, a green ideal-intake band, and a new home notification feed. Use existing Instrument Sans, 17 pt-equivalent body, 4 pt spacing rhythm and at least 44 pt controls; source and personal-decision depth is navigational rather than decorative.
+
+## Report composition
+
+- Initial view: period and recorded-day count; one short takeaway; aligned nutrient comparisons on a shared personal-goal percentage scale; one selected nutrient's daily series.
+- Tap a nutrient row to change the daily chart. Show directly labeled goal/reference lines and units. Keep missing dates as actual gaps; never connect across missing dates or draw zeros.
+- Display unreported composition as a compact partial-data row, not a false low-intake chart. Recorded-day coverage does not imply complete food logging.
+- Place exact daily values, comparison methods, interpretation and source links behind disclosure. Do not duplicate every plotted number in narrative paragraphs.
+- Percentages derive from the same synthetic daily arrays shown in the exact-value table. Choline: 600/750 = 80%; fiber: 32.2/35 = 92%; calcium: 1,040/1,000 = 104%; protein: 155.2/160 = 97%. All targets are illustrative personal choices.
+- Sparse-data reports use a compact recorded/missing-date strip and one status sentence. No fabricated comparisons.
+- On larger text, comparison labels and marks stack; exact values remain available to assistive technology. Native implementation should use Swift Charts and provide native chart accessibility and exact-value navigation.
 
 ## Behavior
 
@@ -46,6 +56,8 @@ Build on bounded historical context and target history from chat-goals, and refe
 
 ## Acceptance criteria for implementation
 
+- [ ] The report is understandable from charts and direct labels with at most one short initial takeaway; prose details are optional.
+- [ ] All four nutrient selections update the daily series and exact-value table; missing dates break the line, and partial values cannot appear as zero or a complete percentage.
 - [ ] Off creates no jobs, model calls or pushes; notification denial still permits report reading/manual generation.
 - [ ] Sparse/partial fixtures yield data-quality copy, never zero-filled deficiency claims.
 - [ ] Choline custom-target example shows both 80% personal-target comparison and the distinct reference.
