@@ -17,3 +17,10 @@
 - Browser screenshots are design references, not screenshots of the native app. No physical-device, native keyboard/safe-area, full VoiceOver or accessibility certification claim.
 - No live model, research retrieval, settings persistence, target migration, history aggregation, push permission, scheduled job or injection-resistance test. Those remain implementation acceptance criteria.
 - Prototype steps can be selected directly for review; that reviewer navigation does not represent a production route around proposal consent.
+
+## Compact-layout refinement
+
+- Rechecked all selectable states at 320/390 px with normal/larger text and light/dark appearance; no horizontal overflow or JavaScript page errors.
+- Action buttons use their content width; navigation/data rows keep full-row hit targets. Decorative text/card rails were removed.
+- Nutrient reference labels use plain language. The reports overview opens chart detail separately, and All nutrients exposes the full catalog with unsampled/partial states.
+- No physical-iPhone diary access or real-history analysis occurred. Native implementation/verification is still outstanding.
