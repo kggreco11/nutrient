@@ -402,26 +402,47 @@ struct NativeToday: View {
     }
   }
   private var homeHeader: some View {
-    (typeSize.isAccessibilitySize
-      ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-      : AnyLayout(HStackLayout(alignment: .center, spacing: 12))) {
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Today").font(NutrientType.font(.title2, weight: .semibold)).accessibilityAddTraits(.isHeader)
-        Text(store.date, format: .dateTime.weekday(.wide).month(.abbreviated).day())
-          .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: FieldSpace.controls) {
+        homeDate.fixedSize(horizontal: true, vertical: true)
+        Spacer(minLength: FieldSpace.controls)
+        homeNavigation.fixedSize(horizontal: true, vertical: true)
+      }
+      VStack(alignment: .leading, spacing: FieldSpace.item) {
+        homeDate
+        homeNavigation
       }.frame(maxWidth: .infinity, alignment: .leading)
-      HStack(spacing: 12) {
-        NavigationLink("Trends") { NativeTrends() }
-        NavigationLink("Library") { NativeLibrary() }
-        Menu {
-          Button("Search foods", systemImage: "magnifyingglass") { add = true }
-          NavigationLink { NativeSettings() } label: { Label("Settings", systemImage: "slider.horizontal.3") }
-        } label: { Image(systemName: "ellipsis").frame(minWidth: 44, minHeight: 44) }
-          .accessibilityLabel("More options")
-      }.font(NutrientType.font(.subheadline, weight: .semibold)).foregroundStyle(Color("FieldInk"))
-        .buttonStyle(.plain).frame(minHeight: 44)
     }.padding(.horizontal, 16).padding(.vertical, 12).frame(maxWidth: 632)
       .frame(maxWidth: .infinity).background(Color("FieldBackground"))
+  }
+  private var homeDate: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text("Today").font(NutrientType.font(.title2, weight: .semibold)).accessibilityAddTraits(.isHeader)
+      Text(store.date, format: .dateTime.weekday(.wide).month(.abbreviated).day())
+        .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
+    }
+  }
+  private var homeNavigation: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: FieldSpace.controls) { homeNavigationLinks }
+        .fixedSize(horizontal: true, vertical: true)
+      VStack(alignment: .leading, spacing: FieldSpace.tight) { homeNavigationLinks }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }.font(NutrientType.font(.subheadline, weight: .semibold))
+      .foregroundStyle(Color("FieldInk")).buttonStyle(.plain)
+  }
+  @ViewBuilder private var homeNavigationLinks: some View {
+    NavigationLink { NativeTrends() } label: {
+      Text("Trends").fixedSize(horizontal: true, vertical: true).frame(minWidth: 44, minHeight: 44)
+    }
+    NavigationLink { NativeLibrary() } label: {
+      Text("Library").fixedSize(horizontal: true, vertical: true).frame(minWidth: 44, minHeight: 44)
+    }
+    Menu {
+      Button("Search foods", systemImage: "magnifyingglass") { add = true }
+      NavigationLink { NativeSettings() } label: { Label("Settings", systemImage: "slider.horizontal.3") }
+    } label: { Image(systemName: "ellipsis").frame(minWidth: 44, minHeight: 44) }
+      .accessibilityLabel("More options")
   }
   private var captureActions: some View {
     (typeSize.isAccessibilitySize

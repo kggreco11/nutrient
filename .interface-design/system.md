@@ -10,7 +10,7 @@ A nutrition journal for someone logging meals and training toward a weight goal.
 
 - One clear task per screen. Today prioritizes progress, shortfalls, and correcting/logging food. Order: progress, remaining nutrients, food log, water, full nutrient catalog.
 - Today has two aligned rings and three macro bars. Align the circle centers independently of caption wrapping. Accessibility text uses stacked linear progress instead.
-- Expose Trends and Library by name. Keep Scan / Log food / Speak in a safe-area action dock, reachable while scrolling. This is an action group, not a bottom tab navigator.
+- Expose Trends and Library by name. Measure their intrinsic label widths and adapt the header to available space; keep each navigation label intact. Fall back to navigation below the title, then vertically stacked controls, rather than relying on a text-size threshold. Keep Scan / Log food / Speak in a safe-area action dock, reachable while scrolling. This is an action group, not a bottom tab navigator.
 - Show two shortfalls on Today and link to the full list. Food entries are directly editable; the diary editor remains discoverable.
 - Trends groups frequency/range/nutrient controls ahead of the plot. Default to an explicitly labeled period average over recorded days; inspection changes to a dated value. Preserve daily, weekly and monthly aggregation and exact-value access.
 - A chat proposal is the review surface: inspect and edit components there, select meal/date, then explicitly Confirm & log. Preserve grouping and reusable-meal options through disclosure. Each added feature should reduce the distance from intent to a correctable result.

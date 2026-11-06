@@ -13,3 +13,7 @@
 - Captures use isolated synthetic fixture data. Restored Simulator to normal app launch after verification.
 
 No publication, Git push or physical-phone installation. No new backend/model behavior was changed or tested. A full VoiceOver pass, smallest-device matrix, camera/speech permissions on a real phone and real-device touch performance remain unverified. Existing build warnings include a pre-existing ambiguous trailing closure and skipped AppIntents metadata extraction.
+
+## Home navigation wrapping regression
+
+Reproduced Trends/Library splitting across lines on iPhone 17 at the largest standard text size. The header only switched orientation for accessibility categories, allowing compression below each label’s intrinsic width. Replaced that threshold with available-width layout selection and uncompressed navigation labels; the fallback places navigation below the date and stacks its controls when needed. Verified native iPhone 16e (390 pt) at default, largest standard and maximum accessibility text sizes, with empty/populated fixtures. Simulator and signed device builds pass. No model or persistence behavior changed.
