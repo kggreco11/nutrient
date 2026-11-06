@@ -192,6 +192,53 @@ import UIKit
     mealStore.log([MealItem(food: bread, quantity: .nan), MealItem(food: cheese, quantity: 1)], meal: "Lunch", groupedAs: "Invalid")
     precondition(mealStore.day.entries.count == beforeInvalid)
     print("Combined meal logging, quantities, ingredient snapshots, partial data, supplements and persistence passed")
+    let savedRecipe = try mealStore.saveMeal("Usual sandwich", items: ingredients)
+    mealStore.log([MealItem(food: savedRecipe, quantity: 1)], meal: "Dinner")
+    let historicEntry = mealStore.day.entries.last!
+    let oldEnergy = mealStore.food(historicEntry.foodId)!.calories
+    let recoveredItems = mealStore.mealItems(savedRecipe)
+    precondition(recoveredItems.count == 3 && recoveredItems[0].food.calories == 250)
+    precondition(recoveredItems[0].food.gramsPerServing == 100)
+    var changedItems = recoveredItems
+    changedItems[1].quantity = 0.5
+    changedItems.removeLast()
+    let changedRecipe = try mealStore.saveMeal("More cheese", items: changedItems, replacing: savedRecipe)
+    precondition(changedRecipe.id != savedRecipe.id && changedRecipe.components?.count == 2)
+    precondition(changedRecipe.calories == 350 && changedRecipe.value("protein") == 18.5)
+    precondition(mealStore.food(savedRecipe.id)?.archived == true)
+    precondition(mealStore.food(historicEntry.foodId)?.calories == oldEnergy,
+      "Editing a saved recipe must preserve past diary nutrition")
+    let reloadedRecipes = NutrientStore(seedURL: seedURL, storageURL: directory.appendingPathComponent("meals.json"), mirrorPreferences: false)
+    let roundtripItems = reloadedRecipes.mealItems(reloadedRecipes.food(changedRecipe.id)!)
+    precondition(roundtripItems[1].quantity == 0.5 && roundtripItems[1].food.calories == 400)
+    var legacyRecipe = savedRecipe
+    legacyRecipe.components = savedRecipe.components?.map {
+      FoodComponent(name: $0.name, serving: $0.serving, source: $0.source, quantity: $0.quantity, values: $0.values)
+    }
+    mealStore.remember(bread)
+    precondition(mealStore.mealItems(legacyRecipe)[0].food.calories == 250,
+      "Legacy components must recover exact serving matches from the saved catalog")
+    let beforeRecipeEdit = mealStore.state.customFoods.count
+    do {
+      _ = try mealStore.saveMeal("Invalid", items: [MealItem(food: bread, quantity: .nan)], replacing: changedRecipe)
+      fatalError("Accepted invalid recipe quantity")
+    } catch {}
+    precondition(mealStore.state.customFoods.count == beforeRecipeEdit && mealStore.food(changedRecipe.id)?.archived != true)
+    let unresolved = NativeFood(id: "missing", name: "Missing", serving: "1 serving", calories: 0, values: [:], energyUnreported: true)
+    do {
+      _ = try mealStore.saveMeal("Unresolved", items: [MealItem(food: unresolved, quantity: 1)], replacing: changedRecipe)
+      fatalError("Overwrote a known recipe energy total with missing component energy")
+    } catch {}
+    precondition(mealStore.food(changedRecipe.id)?.archived != true)
+    let failingStore = NutrientStore(seedURL: seedURL, storageURL: directory.appendingPathComponent("not-a-folder/state.json"), mirrorPreferences: false)
+    failingStore.state.customFoods.append(changedRecipe)
+    let failingCount = failingStore.state.customFoods.count
+    do {
+      _ = try failingStore.saveMeal("Failed save", items: ingredients, replacing: changedRecipe)
+      fatalError("Accepted a failed recipe write")
+    } catch {}
+    precondition(failingStore.state.customFoods.count == failingCount && failingStore.food(changedRecipe.id)?.archived != true)
+    print("Saved meal editing passed: full ingredient snapshots, legacy lookup, recomputation, history preservation, invalid input, persistence and write rollback")
     let trendStore = NutrientStore(seedURL: seedURL, storageURL: directory.appendingPathComponent("trends.json"), mirrorPreferences: false)
     let trendCalendar = NativeTrendInterval.weekly.calendar
     trendStore.date = trendCalendar.date(from: DateComponents(year: 2027, month: 1, day: 6, hour: 12))!

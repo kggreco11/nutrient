@@ -15,6 +15,7 @@ struct FoodComponent: Codable {
   let source: String
   let quantity: Double
   var values: [String: Double?]? = nil
+  var food: NativeFood? = nil
 }
 struct NativeFood: Codable, Identifiable {
   var id: String
@@ -527,10 +528,57 @@ struct NativeDayContext: Encodable {
       components: items.map {
         FoodComponent(
           name: $0.food.name, serving: $0.food.serving, source: $0.food.source ?? "Custom",
-          quantity: $0.quantity, values: $0.food.values)
+          quantity: $0.quantity, values: $0.food.values, food: $0.food)
       }, energyUnreported: items.contains { $0.food.energyUnreported == true },
       servingGrams: items.allSatisfy { $0.food.gramsPerServing != nil }
         ? items.reduce(0) { $0 + ($1.food.gramsPerServing ?? 0) * $1.quantity } : nil)
+  }
+  // Old meals retain per-serving nutrient snapshots but may lack energy and portion metadata.
+  func mealItems(_ meal: NativeFood) -> [MealItem] {
+    (meal.components ?? []).map { component in
+      if let snapshot = component.food { return MealItem(food: snapshot, quantity: component.quantity) }
+      let matches = (foods + database).filter {
+        $0.kind != "meal" && $0.name == component.name && $0.serving == component.serving
+      }
+      let exact = matches.first { ($0.source ?? "Custom") == component.source }
+      var food = exact ?? NativeFood(
+        id: "ingredient-" + UUID().uuidString, name: component.name, serving: component.serving,
+        calories: 0, values: [:], source: component.source, energyUnreported: true)
+      // Preserve the nutrients actually saved with the recipe, even if the catalog has changed.
+      if let values = component.values { food.values = values }
+      return MealItem(food: food, quantity: component.quantity)
+    }
+  }
+  @discardableResult func saveMeal(
+    _ name: String, items: [MealItem], replacing original: NativeFood? = nil
+  ) throws -> NativeFood {
+    func invalid(_ message: String) -> NSError {
+      NSError(domain: "Nutrient", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, !items.isEmpty, items.allSatisfy({
+      !$0.food.isSupplement && $0.quantity.isFinite && $0.quantity > 0 && $0.quantity <= 100
+        && $0.food.calories.isFinite && $0.food.calories >= 0
+        && $0.food.values.values.allSatisfy { $0 == nil || ($0!.isFinite && $0! >= 0) }
+    }) else { throw invalid("Enter a meal name and valid ingredient amounts.") }
+    var index: Int?
+    if let original {
+      guard let found = state.customFoods.firstIndex(where: {
+        $0.id == original.id && $0.kind == "meal" && $0.archived != true
+      }) else { throw invalid("This saved meal changed. Reopen it from the library.") }
+      index = found
+      if original.energyUnreported != true && items.contains(where: { $0.food.energyUnreported == true }) {
+        throw invalid("Enter the missing ingredient calories before saving this recipe.")
+      }
+    }
+    let meal = composite(trimmed, items: items)
+    let previous = state
+    // New identity preserves the recipe and nutrition used by past diary entries and nested meals.
+    if let index { state.customFoods[index].archived = true }
+    state.customFoods.append(meal)
+    do { try persist() }
+    catch { state = previous; throw invalid("Couldn't save this meal. Try again.") }
+    return meal
   }
   func loadDatabase() async {
     guard database.isEmpty else { return }

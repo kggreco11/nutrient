@@ -51,6 +51,9 @@ struct NutrientAppView: View {
         case "review": NativeMealReview(items: NativeDesignFixture.ingredients)
         case "trends": NavigationStack { NativeTrends() }
         case "diary": NavigationStack { NativeDiary() }
+        case "library": NavigationStack { NativeLibrary() }
+        case "saved-meal": NativeSavedMealDetail(food: store.food("fixture-recipe")!)
+        case "edit-meal": NativeMealBuilder(existing: store.food("fixture-recipe")!, initialItems: NativeDesignFixture.ingredients)
         case "nutrient": NavigationStack { NativeNutrientDetail(id: "protein") }
         case "chat": NativeChat()
         default: NativeToday()
@@ -1865,11 +1868,17 @@ struct NativeLibrary: View {
         Button {
           chosen = food
         } label: {
-          FoodRow(food: food)
+          HStack(spacing: FieldSpace.item) {
+            FoodRow(food: food)
+            if food.kind == "meal" {
+              Image(systemName: "chevron.right").font(NutrientType.font(.subheadline))
+                .foregroundStyle(Color("FieldSecondary")).accessibilityHidden(true)
+            }
+          }
         }.foregroundStyle(.primary).swipeActions {
           Button("Archive", role: .destructive) { store.archive(food) }
         }.swipeActions(edge: .leading) {
-          if food.kind != "meal" { Button("Edit") { editing = food } }
+          Button("Edit") { editing = food }
         }
       }
     }.fieldSurface().searchable(text: $query, prompt: "Find saved items")
@@ -1902,10 +1911,79 @@ struct NativeLibrary: View {
       .sheet(isPresented: $custom) { NativeCustomFood(supplement: supplement) }
       .sheet(isPresented: $label) { NativeCustomFood(supplement: false, scanOnOpen: true) }
       .sheet(item: $editing) { food in
-        NativeCustomFood(supplement: food.isSupplement, existing: food)
+        if food.kind == "meal" {
+          NativeMealBuilder(existing: food, initialItems: store.mealItems(food))
+        } else {
+          NativeCustomFood(supplement: food.isSupplement, existing: food)
+        }
       }
       .sheet(isPresented: $build) { NativeMealBuilder() }
-      .sheet(item: $chosen) { food in NativeMealReview(items: [MealItem(food: food, quantity: 1)]) }
+      .sheet(item: $chosen) { food in
+        if food.kind == "meal" { NativeSavedMealDetail(food: food) }
+        else { NativeMealReview(items: [MealItem(food: food, quantity: 1)]) }
+      }
+  }
+}
+struct NativeSavedMealDetail: View {
+  @EnvironmentObject var store: NutrientStore
+  @Environment(\.dismiss) private var dismiss
+  @State var food: NativeFood
+  @State private var editing = false
+  @State private var logging = false
+  var body: some View {
+    NavigationStack {
+      FieldList {
+        Section {
+          Text(food.name).font(NutrientType.font(.title2, weight: .semibold))
+          Text("Per \(food.serving)").foregroundStyle(Color("FieldSecondary"))
+          LabeledContent("Energy", value: food.energyUnreported == true
+            ? "≥ \(number(food.calories)) kcal" : "\(number(food.calories)) kcal")
+          ForEach(["protein", "carbs", "fat"], id: \.self) { id in
+            if let amount = food.value(id) {
+              LabeledContent(id == "carbs" ? "Carbs" : id.capitalized, value: "\(number(amount)) g")
+            }
+          }
+        }
+        Section("Ingredients · \(food.components?.count ?? 0)") {
+          ForEach(Array(store.mealItems(food).enumerated()), id: \.offset) { _, item in
+            DisclosureGroup {
+              LabeledContent("Amount", value: "\(number(item.quantity)) × \(item.food.serving)")
+              if item.food.energyUnreported != true {
+                LabeledContent("Energy", value: "\(number(item.food.calories * item.quantity)) kcal")
+              }
+              ForEach(store.nutrients.filter { item.food.value($0.id) != nil }) { nutrient in
+                FieldValuePair {
+                  Text(nutrient.name)
+                } trailing: {
+                  Text("\(number((item.food.value(nutrient.id) ?? 0) * item.quantity)) \(nutrient.unit)")
+                }.frame(maxWidth: .infinity)
+              }
+            } label: {
+              VStack(alignment: .leading, spacing: FieldSpace.tight) {
+                Text(item.food.name).font(NutrientType.font(.body, weight: .medium))
+                Text(item.food.gramsPerServing.map { "\(number(item.quantity * $0)) g" }
+                  ?? "\(number(item.quantity)) × \(item.food.serving)")
+                  .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
+              }.frame(minHeight: FieldSpace.row, alignment: .leading)
+            }
+          }
+        }
+      }.fieldTitle("Saved meal")
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+          ToolbarItem(placement: .confirmationAction) { Button("Edit") { editing = true } }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+          Button("Log meal", systemImage: "plus") { logging = true }
+            .buttonStyle(NutrientCaptureStyle(primary: true))
+            .padding().background(Color("FieldBackground"))
+        }
+        .sheet(isPresented: $editing) {
+          NativeMealBuilder(existing: food, initialItems: store.mealItems(food), onSave: { food = $0 })
+        }
+        .sheet(isPresented: $logging) { NativeMealReview(items: [MealItem(food: food, quantity: 1)]) }
+        .task { await store.loadDatabase() }
+    }
   }
 }
 struct NativeCustomFood: View {
@@ -2086,43 +2164,98 @@ struct NativeCustomFood: View {
 struct NativeMealBuilder: View {
   @EnvironmentObject var store: NutrientStore
   @Environment(\.dismiss) var dismiss
-  @State private var name = ""
-  @State private var items: [MealItem] = []
+  let existing: NativeFood?
+  var onSave: ((NativeFood) -> Void)?
+  @State private var name: String
+  @State private var items: [MealItem]
   @State private var search = false
+  @State private var failure: String?
+  @State private var energyInputs: [UUID: String]
+  init(existing: NativeFood? = nil, initialItems: [MealItem] = [], onSave: ((NativeFood) -> Void)? = nil) {
+    self.existing = existing
+    self.onSave = onSave
+    _name = State(initialValue: existing?.name ?? "")
+    _items = State(initialValue: initialItems)
+    _energyInputs = State(initialValue: Dictionary(uniqueKeysWithValues:
+      initialItems.filter { $0.food.energyUnreported == true }.map { ($0.id, "") }))
+  }
   var body: some View {
     NavigationStack {
       FieldForm {
-        TextField("Meal name", text: $name)
-        ForEach($items) { $item in
-          VStack(alignment: .leading) {
-            Text(item.food.name)
-            NativeQuantityInput(food: item.food, quantity: $item.quantity)
+        Section("Meal") { TextField("Meal name", text: $name) }
+        Section("Ingredients") {
+          ForEach($items) { $item in
+            let ingredientID = item.id
+            DisclosureGroup {
+              NativeQuantityInput(food: item.food, quantity: $item.quantity)
+              if energyInputs[ingredientID] != nil {
+                TextField("Calories per \(item.food.serving)", text: Binding(
+                  get: { energyInputs[ingredientID] ?? "" },
+                  set: { text in
+                    energyInputs[ingredientID] = text
+                    if let value = Double(text), value.isFinite, value >= 0 {
+                      item.food.calories = value
+                      item.food.energyUnreported = false
+                    } else {
+                      item.food.calories = 0
+                      item.food.energyUnreported = true
+                    }
+                  })).keyboardType(.decimalPad)
+              }
+              Button("Remove ingredient", role: .destructive) {
+                items.removeAll { $0.id == ingredientID }
+              }
+            } label: {
+              VStack(alignment: .leading, spacing: FieldSpace.tight) {
+                Text(item.food.name).font(NutrientType.font(.body, weight: .medium))
+                Text(item.food.gramsPerServing.map { "\(number(item.quantity * $0)) g" }
+                  ?? "\(number(item.quantity)) × \(item.food.serving)")
+                  .font(NutrientType.font(.subheadline)).foregroundStyle(Color("FieldSecondary"))
+                if item.food.energyUnreported == true {
+                  Text("Add ingredient calories").font(NutrientType.font(.subheadline))
+                    .foregroundStyle(Color("FieldError"))
+                }
+              }.frame(minHeight: FieldSpace.row, alignment: .leading)
+            }
+          }.onDelete { items.remove(atOffsets: $0) }
+          Button("Add ingredient", systemImage: "plus") { search = true }
+        }
+        Section("Per meal") {
+          LabeledContent("Energy", value: items.contains { $0.food.energyUnreported == true }
+            ? "≥ \(number(items.reduce(0) { $0 + $1.food.calories * $1.quantity })) kcal"
+            : "\(number(items.reduce(0) { $0 + $1.food.calories * $1.quantity })) kcal")
+          ForEach(["protein", "carbs", "fat"], id: \.self) { id in
+            if items.contains(where: { $0.food.value(id) != nil }) {
+              LabeledContent(id == "carbs" ? "Carbs" : id.capitalized,
+                value: "\(number(items.reduce(0) { $0 + ($1.food.value(id) ?? 0) * $1.quantity })) g")
+            }
           }
-        }.onDelete { items.remove(atOffsets: $0) }
-        Button("Add ingredient") { search = true }
-        LabeledContent(
-          "Energy", value: "\(number(items.reduce(0){$0+$1.food.calories*$1.quantity})) kcal")
-      }.fieldSurface().navigationTitle("Build a meal").navigationBarTitleDisplayMode(.inline)
+        }
+      }.fieldSurface().navigationTitle(existing == nil ? "Build a meal" : "Edit meal")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
           ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
           ToolbarItem(placement: .confirmationAction) {
             Button("Save") {
-              store.state.customFoods.append(store.composite(name, items: items))
-              store.save()
-              dismiss()
-            }.disabled(
-              name.trimmingCharacters(in: .whitespaces).isEmpty || items.isEmpty
-                || items.contains { $0.quantity <= 0 || $0.quantity > 100 })
+              do {
+                let saved = try store.saveMeal(name, items: items, replacing: existing)
+                onSave?(saved)
+                dismiss()
+              } catch { failure = error.localizedDescription }
+            }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || items.isEmpty
+              || items.contains { !$0.quantity.isFinite || $0.quantity <= 0 || $0.quantity > 100 })
           }
         }
+        .alert("Couldn't save meal", isPresented: Binding(
+          get: { failure != nil }, set: { if !$0 { failure = nil } })) {
+          Button("OK", role: .cancel) { failure = nil }
+        } message: { Text(failure ?? "") }
         .sheet(isPresented: $search) {
           NativeFoodSearch(selected: { food in
             if !food.isSupplement {
-              if let i = items.firstIndex(where: { $0.food.id == food.id }) {
-                items[i].quantity += 1
-              } else {
-                items.append(MealItem(food: food, quantity: 1))
-              }
+              let item = MealItem(food: food, quantity: 1)
+              if food.energyUnreported == true { energyInputs[item.id] = "" }
+              items.append(item)
             }
           })
         }
@@ -2298,6 +2431,11 @@ struct NativeSettings: View {
         NativeMessage(role: "assistant", content: "Your meal is ready to review."),
       ]
       store.state.pendingMeal = ingredients
+      if ["saved-meal", "edit-meal", "library"].contains(argument("--design-screen") ?? "") {
+        var recipe = store.composite("Grilled cheese", items: ingredients)
+        recipe.id = "fixture-recipe"
+        store.state.customFoods.append(recipe)
+      }
       if ["reading", "follow"].contains(argument("--design-fixture") ?? "") {
         store.state.pendingMeal = nil
         store.state.chatHistory = (1...30).map {
