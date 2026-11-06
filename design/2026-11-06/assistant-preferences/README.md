@@ -69,3 +69,7 @@ No implementation issue is closed by this design PR. Preserve the diary and hist
 - [Nutrient evidence and baselines](https://github.com/kggreco11/nutrient/issues/2)
 - [Optional reports](https://github.com/kggreco11/nutrient/issues/3), dependent on historical context and baseline metadata
 - [Assistant response preferences](https://github.com/kggreco11/nutrient/issues/4), a later feature with protected app workflows
+
+## Layout refinement · 6 November 2026
+
+The shared design contract now records the user’s preference for content-sized action buttons, text grouped without decorative vertical accent rails, compact phone overviews, and plain-language reference labels. Navigation and selectable data rows retain full-row hit areas. Native implementation and iPhone validation remain outstanding.
