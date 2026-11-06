@@ -32,6 +32,12 @@ Depth: surface tones and subtle rules. Reserve the main card for the progress su
 - Reveal exact values, methods, reference explanations and research through selection or disclosure. Keep units, time range, comparison basis and recorded-day counts visible; missing or partial data must remain legible without opening fine print.
 - Increase useful information per screen through alignment and clear visual hierarchy, not smaller essential type, extra panels or more simultaneous charts. Provide an accessible exact-value alternative.
 
+## Personal layout preferences
+
+- Group text with spacing, headings and subtle horizontal rules. Never use a decorative vertical accent stripe beside a card or text block.
+- Size action buttons to their labels with comfortable padding and at least 44 pt hit targets. Use full-width buttons only when the interaction or layout specifically calls for them; navigation and selectable data rows may use their full row.
+- Keep phone report overviews compact; open a selected nutrient's chart in detail instead of stacking large plots. Use plain-language reference labels, with specialist terminology explained in the detail view.
+
 ## Nutrition semantics
 
 Coverage is a score out of 100: mean of 31 capped nutrient percentages. It is not the fraction of targets met. Display the score and target-completion count separately; explain the scope in coverage details. Macros and calories are separate from the 31 targets.
