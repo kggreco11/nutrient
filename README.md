@@ -4,7 +4,7 @@
 
 Log food in plain language, scan a barcode or nutrition label, and see which nutrients you have covered—and which still need attention. Nutrient combines a SwiftUI iPhone app, a bundled food database, and an optional AI assistant. Nutrient tracking and historical views have no subscription gate.
 
-<img src="design/2026-11-02/boardui/home-light.png" width="300" alt="Native Nutrient home with Inter typography in light mode" /> <img src="design/2026-11-02/boardui/home-dark.png" width="300" alt="Native Nutrient home with Inter typography in dark mode" />
+<img src="design/2026-11-06/home-light.png" width="300" alt="Native Nutrient home with Instrument Sans typography in light mode" /> <img src="design/2026-11-06/home-dark.png" width="300" alt="Native Nutrient home with Instrument Sans typography in dark mode" />
 
 Native Simulator captures with synthetic diary data. See the [BoardUI-inspired native refinement](design/2026-11-02/boardui/implementation.md).
 
@@ -143,7 +143,7 @@ Issues and pull requests are welcome. Include reproduction steps for bugs, keep 
 
 ## iPhone design directions
 
-The [design review](design/2026-10-31/research.md) compares three directions inspired by Kevin’s [photography](https://kevingreco.me/photography): **Field**, **Slate**, and **Golden**. The native SwiftUI app has since evolved to a BoardUI-inspired treatment with bundled Inter typography, neutral light/dark panels, readable food rows, nutrient filters, and a fixed meal confirmation action. Scan barcode and Quick log remain directly on the daily home, with labeled navigation and no bottom tabs.
+The [design review](design/2026-10-31/research.md) compares three directions inspired by Kevin’s [photography](https://kevingreco.me/photography): **Field**, **Slate**, and **Golden**. The native SwiftUI app has since evolved to a BoardUI-inspired treatment with bundled Instrument Sans typography, neutral light/dark panels, readable food rows, nutrient filters, and a fixed meal confirmation action. Scan, Log food and Speak remain available in the daily action dock, with visible Trends/Library routes and no bottom navigation tabs.
 
 ![Three iPhone design directions](design/2026-10-31/personal-directions.jpg)
 
@@ -162,3 +162,7 @@ The [latest layout review](design/2026-10-31/navigation-notes.md) compares **Jou
 The [native polish pass](design/2026-10-31/audit/fixes.md) addresses all eight design-audit findings: compact progress and ingredient review, earlier trend priorities, adaptive text layouts, respectful chat scrolling, clearer food search, and explicit calorie-overage wording.
 
 The [native interaction pass](design/2026-10-31/interactions.md) adds animated progress updates, meal-log and scanner feedback, scrubbable trend readouts, and live portion previews.
+
+## Interface design
+
+UI work follows the [Nutrient design contract](.interface-design/system.md): native SwiftUI, paired progress rings, visible logging actions, correctable meal drafts, readable nutrient values and preserved recipe history. The repo’s AGENTS.md loads these rules for future interface changes. Instrument Sans is bundled locally with Dynamic Type support and its open-font license.

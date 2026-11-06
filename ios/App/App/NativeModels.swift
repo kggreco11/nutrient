@@ -238,6 +238,7 @@ struct NativeDayContext: Encodable {
   @Published var state: NativeState
   @Published var date = Date()
   @Published var showingChat = false
+  @Published var startChatDictation = false
   @Published var database: [NativeFood] = []
   @Published private(set) var logRevision = 0
   @Published var sending = false

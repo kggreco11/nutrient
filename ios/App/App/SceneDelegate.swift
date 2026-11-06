@@ -8,9 +8,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     options connectionOptions: UIScene.ConnectionOptions
   ) {
     guard let scene = scene as? UIWindowScene else { return }
-    let titleFont = UIFont(name: "Inter-SemiBold", size: 17)
-    let largeTitleFont = UIFont(name: "Inter-SemiBold", size: 34)
-    assert(titleFont != nil && largeTitleFont != nil, "Bundled Inter fonts must be registered")
+    let titleFont = UIFont(name: "InstrumentSans-SemiBold", size: 17)
+    let largeTitleFont = UIFont(name: "InstrumentSans-SemiBold", size: 34)
+    assert(titleFont != nil && largeTitleFont != nil, "Bundled Instrument Sans fonts must be registered")
     let navigation = UINavigationBarAppearance()
     navigation.configureWithDefaultBackground()
     navigation.titleTextAttributes = [.font: UIFontMetrics(forTextStyle: .headline).scaledFont(

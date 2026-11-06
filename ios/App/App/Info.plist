@@ -68,10 +68,10 @@
 	<string>Use your microphone to dictate a food or meal description. Recording starts only when you tap Speak.</string>
 	<key>UIAppFonts</key>
 	<array>
-		<string>Fonts/Inter-Regular.otf</string>
-		<string>Fonts/Inter-Medium.otf</string>
-		<string>Fonts/Inter-SemiBold.otf</string>
-		<string>Fonts/Inter-Bold.otf</string>
+		<string>Fonts/InstrumentSans-Regular.ttf</string>
+		<string>Fonts/InstrumentSans-Medium.ttf</string>
+		<string>Fonts/InstrumentSans-SemiBold.ttf</string>
+		<string>Fonts/InstrumentSans-Bold.ttf</string>
 	</array>
 </dict>
 </plist>
