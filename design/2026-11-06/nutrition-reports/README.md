@@ -39,10 +39,10 @@ Report preferences → Off / Weekly / Monthly → optional notification opt-in
 ```
 
 - Reports live under Trends → Reports, away from the Today priorities. Store period snapshots with computed data, methodology version, goal/reference versions and evidence links; reports are native in-app content, not PDFs.
-- Default proactive reports and notifications to off. Offer weekly or monthly generation, a manual on-demand report, separate push permission, quiet hours, pause, and per-nutrient topic suppression. Refusing push does not block in-app reports.
+- Default proactive reports and notifications to off. Offer weekly or monthly generation, a manual on-demand report, separate push permission, pause, and per-nutrient topic suppression. Refusing push does not block in-app reports.
 - Use deterministic aggregations before optional narrative generation. Each finding shows period, recorded-day denominator, nutrient-known/partial counts and comparison basis. Never assume recorded days are complete intake.
 - Candidate qualification for review: at least 4 recorded days for a week or 12 for a month, nutrient fully reported on at least 75% of recorded days, and recorded average below 90% of the applicable personal target. These are tunable product thresholds, not clinical criteria; partial records get a data-quality note instead of a confirmed shortfall.
-- Cap a report at two salient findings. Weekly/monthly scheduler creates at most one notification per report, with no unchanged shortfall reminders between reports. Apply global/per-topic suppression, deduplicate by report ID and honor chosen quiet hours.
+- Cap a report at two salient findings. Weekly/monthly scheduler creates at most one notification per report, with no unchanged shortfall reminders between reports. Apply global/per-topic suppression, deduplicate by report ID.
 - Below personal target but above a reference is a comparison with a chosen goal, not evidence of deficiency. Do not prioritize a mildly missed custom target over a meaningful source-scoped limit issue.
 - Compare source-scoped upper limits with the matching contribution only and show total/food/supplement portions. Partial intake may establish an exceeded limit when known intake alone exceeds it, but cannot establish being below it.
 - No diagnosis, treatment inference, forecast, food/supplement recommendation or automated target change. Open-ended follow-up happens only when the user opens chat.
@@ -62,7 +62,7 @@ Build on bounded historical context and target history from chat-goals, and refe
 - [ ] Off creates no jobs, model calls or pushes; notification denial still permits report reading/manual generation.
 - [ ] Sparse/partial fixtures yield data-quality copy, never zero-filled deficiency claims.
 - [ ] Choline custom-target example shows both 80% personal-target comparison and the distinct reference.
-- [ ] Deduplication, pause, quiet hours, unchanged-state suppression and per-topic controls prevent repeated nudges.
+- [ ] Deduplication, pause, unchanged-state suppression and per-topic controls prevent repeated nudges.
 - [ ] Old reports retain stated period and calculation versions; edited/deleted logs correctly invalidate/remove affected data.
 - [ ] Before shipping, verify native Reports navigation, accessibility, empty/loading/failure states and notification permissions.
 
